@@ -1,0 +1,16 @@
+name = "asktheroom"
+main = "worker.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+routes = [
+  { pattern = "asktheroom.org", custom_domain = true }
+]
+
+[vars]
+BETTER_AUTH_URL = "https://asktheroom.org"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "asktheroom-db"
+database_id = "5c7deb91-6276-4f8b-ab27-0b921c6507bc"

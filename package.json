@@ -1,16 +1,16 @@
 {
-  "name": "agentbarn",
+  "name": "asktheroom",
   "version": "0.0.1",
   "private": true,
   "main": "worker.js",
+  "type": "module",
   "dependencies": {
+    "hono": "^4.0.0",
     "better-auth": "^1.6.11",
-    "drizzle-orm": "^0.45.2",
-    "hono": "^4.0.0"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260517.1",
-    "drizzle-kit": "^0.31.10"
-  },
-  "type": "module"
+    "drizzle-kit": "^0.31.4",
+    "@cloudflare/workers-types": "^4.20260517.1"
+  }
 }
