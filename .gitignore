@@ -1,0 +1,23 @@
+node_modules/
+.wrangler/
+
+# Stripe Projects CLI state — contains account/project IDs, regenerate with `stripe projects pull`
+
+# Editor/AI tool metadata
+.agents/
+.claude/
+.cursor/
+.cursorignore
+
+# Vercel CLI state — repo never deployed to Vercel
+.vercel/
+
+# Secrets
+.env.*
+!.env.example
+.clerk-dev
+
+.projects/cache
+.projects/vault
+.env
+.env.local

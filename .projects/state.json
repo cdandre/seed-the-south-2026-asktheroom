@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "providers": {
+    "cloudflare": {
+      "name": "Cloudflare"
+    }
+  },
+  "resources": {
+    "agentbarn-db": {
+      "name": "agentbarn-db",
+      "providerName": "Cloudflare",
+      "serviceId": "d1"
+    },
+    "asktheroom-db": {
+      "name": "asktheroom-db",
+      "providerName": "Cloudflare",
+      "serviceId": "d1"
+    },
+    "cloudflare-plan": {
+      "name": "cloudflare-plan",
+      "providerName": "Cloudflare",
+      "serviceId": "workers:free"
+    },
+    "cloudflare-registrar:domain": {
+      "name": "cloudflare-registrar:domain",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-10": {
+      "name": "cloudflare-registrar:domain-10",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-11": {
+      "name": "cloudflare-registrar:domain-11",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-12": {
+      "name": "cloudflare-registrar:domain-12",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-13": {
+      "name": "cloudflare-registrar:domain-13",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-14": {
+      "name": "cloudflare-registrar:domain-14",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-2": {
+      "name": "cloudflare-registrar:domain-2",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-3": {
+      "name": "cloudflare-registrar:domain-3",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-4": {
+      "name": "cloudflare-registrar:domain-4",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-5": {
+      "name": "cloudflare-registrar:domain-5",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-6": {
+      "name": "cloudflare-registrar:domain-6",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-7": {
+      "name": "cloudflare-registrar:domain-7",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-8": {
+      "name": "cloudflare-registrar:domain-8",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-registrar:domain-9": {
+      "name": "cloudflare-registrar:domain-9",
+      "providerName": "Cloudflare",
+      "serviceId": "registrar:domain"
+    },
+    "cloudflare-workers": {
+      "name": "cloudflare-workers",
+      "providerName": "Cloudflare",
+      "serviceId": "workers"
+    }
+  }
+}
