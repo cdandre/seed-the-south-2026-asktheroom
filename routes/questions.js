@@ -24,12 +24,14 @@ function rowToItem(row) {
   return {
     id: row.id,
     text: row.body,
+    body: row.body,
     tag: row.tag,
     anonymous,
     author_name: anonymous ? null : row.author_name,
     created_at: row.created_at,
     upvote_count: Number(row.upvote_count) || 0,
     upvoter_names: upvoterNames,
+    upvoters: upvoterNames.map((n) => ({ user_name: n })),
     answer_count: Number(row.answer_count) || 0,
   };
 }
@@ -99,7 +101,8 @@ app.post("/", async (c) => {
     return jsonError(c, 400, "invalid JSON body");
   }
 
-  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  const rawText = body?.text ?? body?.body;
+  const text = typeof rawText === "string" ? rawText.trim() : "";
   const tag = typeof body?.tag === "string" ? body.tag : "";
 
   if (typeof body?.anonymous !== "boolean") {
@@ -134,12 +137,14 @@ app.post("/", async (c) => {
     {
       id,
       text,
+      body: text,
       tag,
       anonymous,
       author_name: anonymous ? null : authorName,
       created_at: now,
       upvote_count: 0,
       upvoter_names: [],
+      upvoters: [],
       answer_count: 0,
     },
     201
