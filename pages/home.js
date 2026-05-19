@@ -76,12 +76,20 @@ const layout = (userName) => `<!doctype html>
       padding: 16px; margin-bottom: 16px;
     }
     .ask h2 { margin: 0 0 10px; font-size: 16px; color: var(--amber); letter-spacing: 0.3px; text-transform: uppercase; }
-    .ask textarea {
-      width: 100%; min-height: 90px; resize: vertical;
+    .ask-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .ask-field label {
+      color: var(--text); font-size: 13px; font-weight: 600;
+    }
+    .ask-field label .opt { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
+    .ask textarea, .ask input[type="text"] {
+      width: 100%;
       background: var(--bg); color: var(--text); border: 1px solid var(--border);
       border-radius: 8px; padding: 12px; font: inherit;
     }
-    .ask textarea:focus, .ask select:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+    .ask input[type="text"] { min-height: 44px; }
+    .ask textarea { min-height: 90px; resize: vertical; }
+    .ask textarea#ask-tried { min-height: 60px; }
+    .ask textarea:focus, .ask select:focus, .ask input[type="text"]:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
     .ask-row {
       display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap;
     }
@@ -166,7 +174,18 @@ const layout = (userName) => `<!doctype html>
     <section class="card ask">
       <h2>Ask the room</h2>
       <form id="ask-form">
-        <textarea id="ask-body" maxlength="1000" placeholder="What do you wish someone would answer in 30 seconds?" required></textarea>
+        <div class="ask-field">
+          <label for="ask-context">Where you're at <span class="opt">(optional)</span></label>
+          <input type="text" id="ask-context" maxlength="200" placeholder="e.g., Pre-seed B2B SaaS, 4 months in" />
+        </div>
+        <div class="ask-field">
+          <label for="ask-body">Your ask</label>
+          <textarea id="ask-body" maxlength="1000" placeholder="What do you wish someone would answer in 30 seconds?" required></textarea>
+        </div>
+        <div class="ask-field">
+          <label for="ask-tried">What you've tried <span class="opt">(optional)</span></label>
+          <textarea id="ask-tried" maxlength="500" placeholder="Briefly — saves us time and gets you better answers"></textarea>
+        </div>
         <div class="ask-row">
           <select id="ask-tag">
             ${TAGS.map((t) => `<option value="${t}">${t}</option>`).join("")}
@@ -346,16 +365,26 @@ const layout = (userName) => `<!doctype html>
     askForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       askErr.textContent = "";
-      const body = document.getElementById("ask-body").value.trim();
+      const context = document.getElementById("ask-context").value.trim();
+      const ask = document.getElementById("ask-body").value.trim();
+      const tried = document.getElementById("ask-tried").value.trim();
       const tag = document.getElementById("ask-tag").value;
       const anonymous = document.getElementById("ask-anon").checked;
-      if (!body) { askErr.textContent = "Question can't be empty."; return; }
+      if (!ask) { askErr.textContent = "Question can't be empty."; return; }
+      // Serialize three fields into a single body string. Skip empty optional sections.
+      const parts = [];
+      if (context) parts.push("**Context:** " + context);
+      parts.push(ask);
+      if (tried) parts.push("**What I've tried:** " + tried);
+      const body = parts.join("\n\n");
       askBtn.disabled = true;
       try {
         await jsonFetch("/api/questions", {
           method: "POST", body: JSON.stringify({ body, tag, anonymous }),
         });
+        document.getElementById("ask-context").value = "";
         document.getElementById("ask-body").value = "";
+        document.getElementById("ask-tried").value = "";
         document.getElementById("ask-anon").checked = false;
         await loadFeed();
       } catch (e) {
@@ -400,7 +429,10 @@ const layout = (userName) => `<!doctype html>
     // Auto-refresh feed every 30s. Skip if the user is typing in the ask textarea
     // or has any vote/popover panel open (which can be open from a tap).
     setInterval(() => {
-      const askingActive = document.activeElement === document.getElementById("ask-body");
+      const active = document.activeElement;
+      const askingActive = active && (
+        active.id === "ask-body" || active.id === "ask-context" || active.id === "ask-tried"
+      );
       const popoverOpen = feedEl.querySelector(".upvoter-pop.on");
       if (askingActive || popoverOpen) return;
       loadFeed();
