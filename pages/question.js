@@ -4,9 +4,10 @@
 // Endpoints used:
 //   GET  /api/questions/:id          -> { id, body, tag, anonymous, author_name,
 //                                         created_at, upvote_count, answer_count,
-//                                         upvoters: [{ user_id, user_name }] }
+//                                         upvoters: [{ user_id, user_name }], bookmarked }
 //   GET  /api/answers?question_id=:id -> [{ id, question_id, author_name, body, created_at }]
 //   POST /api/votes  { question_id } -> { upvoted, count }
+//   POST /api/bookmarks { question_id } -> { bookmarked, count }
 //   POST /api/answers { question_id, body } -> created answer
 //   POST /api/answers/notifications/read    -> clear my badge on load
 
@@ -70,6 +71,12 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
               min-width: 110px; min-height: 44px; justify-content: center; }
   .vote-btn:hover { border-color: var(--amber); }
   .vote-btn.upvoted { background: rgba(245, 166, 35, 0.15); border-color: var(--amber); color: var(--amber); }
+  .bookmark-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+                  padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
+                  font-size: 18px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+                  min-width: 60px; min-height: 44px; justify-content: center; line-height: 1; }
+  .bookmark-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .bookmark-btn.on { background: rgba(245, 166, 35, 0.15); border-color: var(--amber); color: var(--amber); }
   .vote-count { font-weight: 600; font-size: 14px; cursor: pointer; user-select: none;
                 color: var(--muted); border-bottom: 1px dotted var(--muted); }
   .vote-count:hover { color: var(--text); }
@@ -184,6 +191,7 @@ app.get("/:id", async (c) => {
 
     let qState = null;
     let myVote = false;
+    let myBookmark = false;
 
     function renderQuestion(q) {
       qState = q;
@@ -191,6 +199,14 @@ app.get("/:id", async (c) => {
       const count = q.upvote_count != null ? q.upvote_count : upvoters.length;
       const authorClass = q.anonymous ? 'author anon' : 'author';
       const authorName = q.anonymous ? 'Anonymous' : (q.author_name || 'Anonymous');
+      const bookmarkBtn = SIGNED_IN
+        ? ('<button id="bookmarkbtn" class="bookmark-btn' + (myBookmark ? ' on' : '') + '"' +
+             ' aria-label="' + (myBookmark ? 'Unsave question' : 'Save question') + '"' +
+             ' aria-pressed="' + (myBookmark ? 'true' : 'false') + '"' +
+             ' title="' + (myBookmark ? 'Unsave' : 'Save') + '">' +
+             '<span id="bookmarkstar">' + (myBookmark ? '★' : '☆') + '</span>' +
+           '</button>')
+        : '';
       const html =
         '<div class="meta">' +
           '<span class="' + authorClass + '">' + esc(authorName) + '</span>' +
@@ -204,6 +220,7 @@ app.get("/:id", async (c) => {
             ' aria-pressed="' + (myVote ? 'true' : 'false') + '">' +
             '▲ ' + count +
           '</button>' +
+          bookmarkBtn +
           '<span class="vote-count" id="vcount" title="Tap to see who upvoted">' +
             count + ' upvote' + (count === 1 ? '' : 's') +
           '</span>' +
@@ -214,7 +231,43 @@ app.get("/:id", async (c) => {
 
       document.getElementById('votebtn').addEventListener('click', toggleVote);
       document.getElementById('vcount').addEventListener('click', toggleUpvoters);
+      const bm = document.getElementById('bookmarkbtn');
+      if (bm) bm.addEventListener('click', toggleBookmark);
       renderUpvoters(upvoters);
+    }
+
+    async function toggleBookmark() {
+      if (!SIGNED_IN) {
+        location.href = '/auth?from=/q/' + encodeURIComponent(QID);
+        return;
+      }
+      const btn = document.getElementById('bookmarkbtn');
+      const errEl = document.getElementById('verr');
+      if (errEl) errEl.textContent = '';
+      if (btn) btn.disabled = true;
+      try {
+        const r = await jsonFetch('/api/bookmarks', {
+          method: 'POST',
+          body: JSON.stringify({ question_id: QID }),
+        });
+        myBookmark = !!r.bookmarked;
+        if (btn) {
+          btn.classList.toggle('on', myBookmark);
+          btn.setAttribute('aria-pressed', myBookmark ? 'true' : 'false');
+          btn.setAttribute('aria-label', myBookmark ? 'Unsave question' : 'Save question');
+          btn.setAttribute('title', myBookmark ? 'Unsave' : 'Save');
+        }
+        const starEl = document.getElementById('bookmarkstar');
+        if (starEl) starEl.textContent = myBookmark ? '★' : '☆';
+      } catch (e) {
+        if (e.status === 401) {
+          location.href = '/auth?from=/q/' + encodeURIComponent(QID);
+          return;
+        }
+        if (errEl) errEl.textContent = e.message || 'Bookmark failed';
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     }
 
     function renderUpvoters(list) {
@@ -250,6 +303,7 @@ app.get("/:id", async (c) => {
         myVote = !!r.upvoted;
         // Refresh question to get new count + upvoter list.
         const q = await jsonFetch('/api/questions/' + encodeURIComponent(QID));
+        if (q.bookmarked != null) myBookmark = !!q.bookmarked;
         renderQuestion(q);
       } catch (e) {
         if (e.status === 401) {
@@ -325,6 +379,7 @@ app.get("/:id", async (c) => {
             });
             // Reload question + answers to reflect new accepted state.
             const q = await jsonFetch('/api/questions/' + encodeURIComponent(QID));
+            if (q.bookmarked != null) myBookmark = !!q.bookmarked;
             renderQuestion(q);
             const a = await jsonFetch('/api/answers?question_id=' + encodeURIComponent(QID));
             renderAnswers(Array.isArray(a) ? a : (a.answers || []));
@@ -372,6 +427,7 @@ app.get("/:id", async (c) => {
         // Try to detect if current user upvoted by checking upvoters list against session.
         // Backend may also return q.user_upvoted; respect that if present.
         if (q.user_upvoted != null) myVote = !!q.user_upvoted;
+        if (q.bookmarked != null) myBookmark = !!q.bookmarked;
         renderQuestion(q);
       } catch (e) {
         document.getElementById('qcard').innerHTML =

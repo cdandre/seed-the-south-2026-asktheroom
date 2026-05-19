@@ -122,6 +122,31 @@ app.post("/", async (c) => {
         .run();
     }
 
+    // Notify everyone who bookmarked this question, EXCEPT:
+    //   - the answer author (don't self-notify)
+    //   - the question author (already got a notification above — no double-count)
+    try {
+      const { results: followers } = await c.env.DB.prepare(
+        `SELECT user_id FROM bookmarks
+          WHERE question_id = ?
+            AND user_id != ?
+            AND user_id != ?`,
+      )
+        .bind(questionId, authorId, question.author_id || "")
+        .all();
+      for (const f of followers || []) {
+        await c.env.DB.prepare(
+          `INSERT INTO notifications (id, user_id, question_id, answer_id, read, created_at)
+           VALUES (?, ?, ?, ?, 0, ?)`,
+        )
+          .bind(newId(), f.user_id, questionId, id, now)
+          .run();
+      }
+    } catch (e) {
+      // Don't fail the answer POST if fan-out notifications break — log and move on.
+      console.error("bookmark fan-out notifications failed:", e);
+    }
+
     return c.json(
       {
         answer: {

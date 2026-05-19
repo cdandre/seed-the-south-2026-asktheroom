@@ -2,10 +2,11 @@
 // Owner: frontend-2
 //
 // Endpoints used (must match backend):
-//   GET  /api/questions?tag=<tag>
+//   GET  /api/questions?tag=<tag>&filter=saved
 //   POST /api/questions            { body, tag, anonymous }
 //   GET  /api/votes?question_id=<id>
 //   POST /api/votes                { question_id }
+//   POST /api/bookmarks            { question_id }  -> toggle
 //   GET  /api/answers/notifications        -> array; length = unread count
 //   POST /api/answers/notifications/read   -> clear
 
@@ -145,6 +146,24 @@ const layout = (userName) => `<!doctype html>
     .upvoter-pop.on { display: block; }
     .answers-link { color: var(--muted); margin-left: auto; font-size: 14px; padding: 6px 2px; }
     .answers-link:hover { color: var(--amber); }
+    .bookmark {
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+      padding: 8px 12px; border-radius: 8px; cursor: pointer; font: inherit;
+      display: inline-flex; align-items: center; gap: 6px; font-size: 16px;
+      min-height: 44px; min-width: 44px; justify-content: center;
+      line-height: 1;
+    }
+    .bookmark:hover { border-color: var(--amber); color: var(--amber); }
+    .bookmark.on { color: var(--amber); border-color: var(--amber); background: rgba(245, 166, 35, 0.15); }
+    .bookmark .star { font-size: 18px; }
+    .tabs { display: flex; gap: 6px; margin: 4px 4px 12px; flex-wrap: wrap; }
+    .tab {
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+      padding: 10px 16px; border-radius: 999px; cursor: pointer; font: inherit;
+      font-size: 14px; min-height: 44px; font-weight: 600;
+    }
+    .tab.on { background: rgba(245, 166, 35, 0.15); border-color: var(--amber); color: var(--amber); }
+    .tab:hover { border-color: var(--amber); color: var(--amber); }
     .card-err {
       color: var(--danger); font-size: 13px; margin-top: 8px; min-height: 0;
     }
@@ -215,6 +234,11 @@ const layout = (userName) => `<!doctype html>
       </form>
     </section>
 
+    <div class="tabs" role="tablist">
+      <button class="tab on" id="tab-all" type="button" role="tab" aria-selected="true">All</button>
+      <button class="tab" id="tab-saved" type="button" role="tab" aria-selected="false">&#9733; Saved</button>
+    </div>
+
     <div class="filter">
       <input id="search-input" type="search" placeholder="Search questions..." style="flex:1; min-width:160px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: inherit;" />
       <label for="tag-filter">Filter:</label>
@@ -268,6 +292,10 @@ const layout = (userName) => `<!doctype html>
     const tagFilter = document.getElementById("tag-filter");
     const sortBy = document.getElementById("sort-by");
     const searchInput = document.getElementById("search-input");
+    const tabAll = document.getElementById("tab-all");
+    const tabSaved = document.getElementById("tab-saved");
+    const askSection = document.querySelector("section.ask");
+    let currentTab = "all"; // "all" | "saved"
 
     async function loadFeed() {
       const params = new URLSearchParams();
@@ -275,6 +303,7 @@ const layout = (userName) => `<!doctype html>
       if (sortBy.value && sortBy.value !== "newest") params.set("sort", sortBy.value);
       const qv = searchInput.value.trim();
       if (qv) params.set("q", qv);
+      if (currentTab === "saved") params.set("filter", "saved");
       const url = "/api/questions" + (params.toString() ? "?" + params.toString() : "");
       try {
         const items = await jsonFetch(url);
@@ -283,6 +312,19 @@ const layout = (userName) => `<!doctype html>
         feedEl.innerHTML = '<div class="feed-status">Could not load feed: ' + escapeHtml(e.message) + '</div>';
       }
     }
+
+    function setTab(name) {
+      currentTab = name;
+      tabAll.classList.toggle("on", name === "all");
+      tabAll.setAttribute("aria-selected", name === "all" ? "true" : "false");
+      tabSaved.classList.toggle("on", name === "saved");
+      tabSaved.setAttribute("aria-selected", name === "saved" ? "true" : "false");
+      // Hide the ask form when viewing Saved — it's a different mental mode.
+      if (askSection) askSection.style.display = name === "saved" ? "none" : "";
+      loadFeed();
+    }
+    tabAll.addEventListener("click", () => setTab("all"));
+    tabSaved.addEventListener("click", () => setTab("saved"));
 
     // Debounced search: 300ms after last keystroke.
     let searchTimer = null;
@@ -308,6 +350,9 @@ const layout = (userName) => `<!doctype html>
         const upCount = q.upvote_count || 0;
         const ansCount = q.answer_count || 0;
         const upvoted = q.upvoted ? "on" : "";
+        const bookmarked = q.bookmarked ? "on" : "";
+        const starChar = q.bookmarked ? '★' : '☆';
+        const bookmarkLabel = q.bookmarked ? "Unsave question" : "Save question";
         const href = '/q/' + encodeURIComponent(q.id);
         return ''
           + '<a class="card q" data-qid="' + escapeHtml(q.id) + '" href="' + href + '">'
@@ -318,6 +363,9 @@ const layout = (userName) => `<!doctype html>
           +   '<div class="q-foot">'
           +     '<button type="button" class="upvote ' + upvoted + '" data-act="upvote" aria-label="Upvote (' + upCount + ')">'
           +       '<span class="arrow">&#9650;</span><span class="count">' + upCount + '</span>'
+          +     '</button>'
+          +     '<button type="button" class="bookmark ' + bookmarked + '" data-act="bookmark" aria-pressed="' + (q.bookmarked ? 'true' : 'false') + '" aria-label="' + bookmarkLabel + '" title="' + bookmarkLabel + '">'
+          +       '<span class="star" data-star>' + starChar + '</span>'
           +     '</button>'
           +     '<span class="upvoters" data-act="show-upvoters">who voted</span>'
           +     '<span class="answers-link">'
@@ -336,6 +384,36 @@ const layout = (userName) => `<!doctype html>
       const qid = card.getAttribute("data-qid");
       const upvoteBtn = ev.target.closest('[data-act="upvote"]');
       const showVoters = ev.target.closest('[data-act="show-upvoters"]');
+      const bookmarkBtn = ev.target.closest('[data-act="bookmark"]');
+      if (bookmarkBtn) {
+        // Don't let the card link navigate.
+        ev.preventDefault();
+        ev.stopPropagation();
+        const errEl = card.querySelector("[data-card-err]");
+        if (errEl) errEl.textContent = "";
+        bookmarkBtn.disabled = true;
+        try {
+          const res = await jsonFetch("/api/bookmarks", {
+            method: "POST", body: JSON.stringify({ question_id: qid }),
+          });
+          const on = !!res.bookmarked;
+          bookmarkBtn.classList.toggle("on", on);
+          bookmarkBtn.setAttribute("aria-pressed", on ? "true" : "false");
+          bookmarkBtn.setAttribute("aria-label", on ? "Unsave question" : "Save question");
+          const starEl = bookmarkBtn.querySelector("[data-star]");
+          if (starEl) starEl.textContent = on ? "★" : "☆";
+          // If we're on the Saved tab and just unsaved, drop the card.
+          if (!on && currentTab === "saved") {
+            card.remove();
+            if (!feedEl.querySelector(".q")) {
+              feedEl.innerHTML = '<div class="feed-status">No saved questions yet. Tap the star on a question to save it.</div>';
+            }
+          }
+        } catch (e) {
+          if (errEl) errEl.textContent = e.message;
+        } finally { bookmarkBtn.disabled = false; }
+        return;
+      }
       if (upvoteBtn) {
         // Don't let the card link navigate.
         ev.preventDefault();

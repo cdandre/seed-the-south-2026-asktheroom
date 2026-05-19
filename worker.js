@@ -7,6 +7,7 @@ import authRoute from "./routes/auth.js";
 import questionsRoute from "./routes/questions.js";
 import answersRoute from "./routes/answers.js";
 import votesRoute from "./routes/votes.js";
+import bookmarksRoute from "./routes/bookmarks.js";
 
 import indexPage from "./pages/index.js";
 import authPage from "./pages/auth.js";
@@ -32,6 +33,7 @@ app.route("/api/auth", authRoute);
 app.route("/api/questions", questionsRoute);
 app.route("/api/answers", answersRoute);
 app.route("/api/votes", votesRoute);
+app.route("/api/bookmarks", bookmarksRoute);
 
 // HTML pages
 app.route("/", indexPage);

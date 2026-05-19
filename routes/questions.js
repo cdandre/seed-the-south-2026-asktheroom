@@ -19,6 +19,7 @@ function rowToItem(row) {
     ? String(csv).split(UPVOTER_SEP).filter(Boolean)
     : [];
   const userUpvoted = !!row.user_upvoted_marker;
+  const bookmarked = !!row.bookmarked_marker;
   return {
     id: row.id,
     text: row.body,
@@ -36,6 +37,7 @@ function rowToItem(row) {
     upvoted: userUpvoted,
     user_upvoted: userUpvoted,
     has_upvoted: userUpvoted,
+    bookmarked,
   };
 }
 
@@ -70,11 +72,20 @@ app.get("/", async (c) => {
   }
   const sort = c.req.query("sort") === "top" ? "top" : "newest";
   const q = (c.req.query("q") || "").trim().slice(0, 100);
+  const filter = c.req.query("filter") === "saved" ? "saved" : null;
   const session = c.get("session");
   const userId = session?.user?.id || null;
+  // Saved filter only makes sense when signed in. Empty list when anonymous —
+  // cleaner than a 401 because the home page can still render the tab.
+  if (filter === "saved" && !userId) {
+    return c.json({ questions: [] });
+  }
   try {
     const userVoteSubquery = userId
       ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
+      : `0`;
+    const bookmarkSubquery = userId
+      ? `(SELECT 1 FROM bookmarks bb WHERE bb.question_id = q.id AND bb.user_id = ?)`
       : `0`;
     const orderBy = sort === "top"
       ? `ORDER BY upvote_count DESC, q.created_at DESC`
@@ -84,6 +95,9 @@ app.get("/", async (c) => {
     // Search matches question body always; matches author name only on non-anonymous
     // questions (prevents enumerating anonymous-question authors via search).
     if (q) whereClauses.push("(q.body LIKE ? OR (q.anonymous = 0 AND q.author_name LIKE ?))");
+    if (filter === "saved") {
+      whereClauses.push("q.id IN (SELECT question_id FROM bookmarks WHERE user_id = ?)");
+    }
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
@@ -92,19 +106,23 @@ app.get("/", async (c) => {
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
                 FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
-             ${userVoteSubquery} AS user_upvoted_marker
+             ${userVoteSubquery} AS user_upvoted_marker,
+             ${bookmarkSubquery} AS bookmarked_marker
         FROM questions q
        ${whereSql}
        ${orderBy}
        LIMIT 100
     `;
+    // Bind order must match placeholder order in SQL above:
+    //   userVoteSubquery (?), bookmarkSubquery (?), then WHERE clauses.
     const binds = [];
-    if (userId) binds.push(userId);
+    if (userId) binds.push(userId, userId);
     if (tag) binds.push(tag);
     if (q) {
       const pattern = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
       binds.push(pattern, pattern);
     }
+    if (filter === "saved") binds.push(userId);
     const stmt = binds.length
       ? c.env.DB.prepare(sql).bind(...binds)
       : c.env.DB.prepare(sql);
@@ -193,6 +211,9 @@ app.get("/:id", async (c) => {
     const userVoteSubquery = userId
       ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
       : `0`;
+    const bookmarkSubquery = userId
+      ? `(SELECT 1 FROM bookmarks bb WHERE bb.question_id = q.id AND bb.user_id = ?)`
+      : `0`;
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
              q.created_at, q.last_answered_at, q.accepted_answer_id,
@@ -200,11 +221,12 @@ app.get("/:id", async (c) => {
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
                 FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
-             ${userVoteSubquery} AS user_upvoted_marker
+             ${userVoteSubquery} AS user_upvoted_marker,
+             ${bookmarkSubquery} AS bookmarked_marker
         FROM questions q
        WHERE q.id = ?
     `;
-    const binds = userId ? [userId, id] : [id];
+    const binds = userId ? [userId, userId, id] : [id];
     const row = await c.env.DB.prepare(sql).bind(...binds).first();
 
     if (!row) return jsonError(c, 404, "question not found");
