@@ -370,6 +370,14 @@ const layout = (userName) => `<!doctype html>
     loadFeed();
     pollNotifications();
     setInterval(pollNotifications, 10000);
+    // Auto-refresh feed every 30s. Skip if the user is typing in the ask textarea
+    // or has any vote/popover panel open (which can be open from a tap).
+    setInterval(() => {
+      const askingActive = document.activeElement === document.getElementById("ask-body");
+      const popoverOpen = feedEl.querySelector(".upvoter-pop.on");
+      if (askingActive || popoverOpen) return;
+      loadFeed();
+    }, 30000);
   </script>
 </body>
 </html>`;
