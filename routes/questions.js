@@ -190,36 +190,28 @@ app.get("/:id", async (c) => {
   const userId = session?.user?.id || null;
 
   try {
-    const row = await c.env.DB.prepare(
-      `SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
-              q.created_at, q.last_answered_at, q.accepted_answer_id,
-              (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
-              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
-              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
-                 FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv
-         FROM questions q
-        WHERE q.id = ?`
-    )
-      .bind(id)
-      .first();
+    const userVoteSubquery = userId
+      ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
+      : `0`;
+    const sql = `
+      SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
+             q.created_at, q.last_answered_at, q.accepted_answer_id,
+             (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
+             (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
+             (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
+                FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
+             ${userVoteSubquery} AS user_upvoted_marker
+        FROM questions q
+       WHERE q.id = ?
+    `;
+    const binds = userId ? [userId, id] : [id];
+    const row = await c.env.DB.prepare(sql).bind(...binds).first();
 
     if (!row) return jsonError(c, 404, "question not found");
 
-    let hasUpvoted = false;
-    if (userId) {
-      const v = await c.env.DB.prepare(
-        `SELECT 1 AS x FROM upvotes WHERE question_id = ? AND user_id = ? LIMIT 1`
-      )
-        .bind(id, userId)
-        .first();
-      hasUpvoted = !!v;
-    }
-
-    const item = rowToItem(row);
-    item.has_upvoted = hasUpvoted;
-    item.user_upvoted = hasUpvoted;
-    item.upvoted = hasUpvoted;
-    return c.json(item);
+    // rowToItem already maps user_upvoted_marker → upvoted/user_upvoted/has_upvoted,
+    // so the response shape is consistent with the list endpoint.
+    return c.json(rowToItem(row));
   } catch (e) {
     console.error("GET /api/questions/:id failed:", e);
     return jsonError(c, 500, "failed to load question");
