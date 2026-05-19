@@ -157,7 +157,8 @@ app.get("/notifications", async (c) => {
       .bind(session.user.id)
       .all();
     return c.json({ notifications: results ?? [] });
-  } catch {
+  } catch (e) {
+    console.error("GET /api/answers/notifications failed:", e);
     return jsonError(c, 500, "failed to load notifications");
   }
 });
@@ -213,7 +214,8 @@ app.post("/notifications/read", async (c) => {
       .bind(session.user.id)
       .run();
     return c.json({ ok: true });
-  } catch {
+  } catch (e) {
+    console.error("POST /api/answers/notifications/read failed:", e);
     return jsonError(c, 500, "failed to mark notifications read");
   }
 });

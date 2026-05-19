@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS questions (
   tag TEXT NOT NULL DEFAULT 'Other',
   body TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  last_answered_at INTEGER
+  last_answered_at INTEGER,
+  accepted_answer_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_questions_created_at ON questions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_questions_tag ON questions(tag);
