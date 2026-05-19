@@ -5,15 +5,12 @@
 // Notifications: GET /api/questions/notifications (declared before /:id so it isn't shadowed).
 
 import { Hono } from "hono";
+import { jsonError } from "../utils.js";
 
 const KNOWN_TAGS = ["Fundraising", "Hiring", "Product", "Sales", "Operations", "Other"];
 const UPVOTER_SEP = "|::|"; // unlikely to appear in a user-entered display name
 
 const app = new Hono();
-
-function jsonError(c, status, message) {
-  return c.json({ message }, status);
-}
 
 function rowToItem(row) {
   const anonymous = !!row.anonymous;

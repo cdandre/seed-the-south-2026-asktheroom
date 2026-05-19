@@ -12,12 +12,9 @@
 // Room voted "see who voted" 3-2 — upvoter names are public per question.
 
 import { Hono } from "hono";
+import { jsonError, newId } from "../utils.js";
 
 const app = new Hono();
-
-function newId() {
-  return crypto.randomUUID();
-}
 
 async function countUpvotes(db, questionId) {
   const row = await db
@@ -31,19 +28,19 @@ async function countUpvotes(db, questionId) {
 app.post("/", async (c) => {
   const session = c.get("session");
   if (!session?.user) {
-    return c.json({ message: "sign in required" }, 401);
+    return jsonError(c, 401, "sign in required");
   }
 
   let payload;
   try {
     payload = await c.req.json();
   } catch {
-    return c.json({ message: "invalid json body" }, 400);
+    return jsonError(c, 400, "invalid json body");
   }
 
   const questionId = typeof payload?.question_id === "string" ? payload.question_id.trim() : "";
   if (!questionId) {
-    return c.json({ message: "question_id is required" }, 400);
+    return jsonError(c, 400, "question_id is required");
   }
 
   const userId = session.user.id;
@@ -73,7 +70,7 @@ app.post("/", async (c) => {
       .bind(questionId)
       .first();
     if (!question) {
-      return c.json({ message: "question not found" }, 404);
+      return jsonError(c, 404, "question not found");
     }
 
     await c.env.DB.prepare(
@@ -85,8 +82,8 @@ app.post("/", async (c) => {
 
     const count = await countUpvotes(c.env.DB, questionId);
     return c.json({ upvoted: true, count });
-  } catch (err) {
-    return c.json({ message: "failed to toggle upvote" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to toggle upvote");
   }
 });
 
@@ -94,7 +91,7 @@ app.post("/", async (c) => {
 app.get("/", async (c) => {
   const questionId = c.req.query("question_id");
   if (!questionId) {
-    return c.json({ message: "question_id is required" }, 400);
+    return jsonError(c, 400, "question_id is required");
   }
   try {
     const { results } = await c.env.DB.prepare(
@@ -107,8 +104,8 @@ app.get("/", async (c) => {
       .all();
     const upvoters = results ?? [];
     return c.json({ upvoters, count: upvoters.length });
-  } catch (err) {
-    return c.json({ message: "failed to load upvoters" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to load upvoters");
   }
 });
 

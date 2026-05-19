@@ -11,21 +11,17 @@
 //   POST /notifications/read -> mark all current-user notifications read.
 
 import { Hono } from "hono";
+import { jsonError, newId } from "../utils.js";
 
 const app = new Hono();
 
 const MAX_BODY = 1000;
 
-function newId() {
-  // crypto.randomUUID is available in the Workers runtime.
-  return crypto.randomUUID();
-}
-
 // GET /api/answers?question_id=...
 app.get("/", async (c) => {
   const questionId = c.req.query("question_id");
   if (!questionId) {
-    return c.json({ message: "question_id is required" }, 400);
+    return jsonError(c, 400, "question_id is required");
   }
   try {
     const { results } = await c.env.DB.prepare(
@@ -37,8 +33,8 @@ app.get("/", async (c) => {
       .bind(questionId)
       .all();
     return c.json({ answers: results ?? [] });
-  } catch (err) {
-    return c.json({ message: "failed to load answers" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to load answers");
   }
 });
 
@@ -46,27 +42,27 @@ app.get("/", async (c) => {
 app.post("/", async (c) => {
   const session = c.get("session");
   if (!session?.user) {
-    return c.json({ message: "sign in required" }, 401);
+    return jsonError(c, 401, "sign in required");
   }
 
   let payload;
   try {
     payload = await c.req.json();
   } catch {
-    return c.json({ message: "invalid json body" }, 400);
+    return jsonError(c, 400, "invalid json body");
   }
 
   const questionId = typeof payload?.question_id === "string" ? payload.question_id.trim() : "";
   const body = typeof payload?.body === "string" ? payload.body.trim() : "";
 
   if (!questionId) {
-    return c.json({ message: "question_id is required" }, 400);
+    return jsonError(c, 400, "question_id is required");
   }
   if (!body) {
-    return c.json({ message: "answer cannot be empty" }, 400);
+    return jsonError(c, 400, "answer cannot be empty");
   }
   if (body.length > MAX_BODY) {
-    return c.json({ message: `answer must be ${MAX_BODY} characters or fewer` }, 400);
+    return jsonError(c, 400, `answer must be ${MAX_BODY} characters or fewer`);
   }
 
   try {
@@ -78,7 +74,7 @@ app.post("/", async (c) => {
       .first();
 
     if (!question) {
-      return c.json({ message: "question not found" }, 404);
+      return jsonError(c, 404, "question not found");
     }
 
     const id = newId();
@@ -121,8 +117,8 @@ app.post("/", async (c) => {
       },
       201,
     );
-  } catch (err) {
-    return c.json({ message: "failed to post answer" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to post answer");
   }
 });
 
@@ -130,7 +126,7 @@ app.post("/", async (c) => {
 app.get("/notifications", async (c) => {
   const session = c.get("session");
   if (!session?.user) {
-    return c.json({ message: "sign in required" }, 401);
+    return jsonError(c, 401, "sign in required");
   }
   try {
     const { results } = await c.env.DB.prepare(
@@ -142,8 +138,8 @@ app.get("/notifications", async (c) => {
       .bind(session.user.id)
       .all();
     return c.json({ notifications: results ?? [] });
-  } catch (err) {
-    return c.json({ message: "failed to load notifications" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to load notifications");
   }
 });
 
@@ -151,7 +147,7 @@ app.get("/notifications", async (c) => {
 app.post("/notifications/read", async (c) => {
   const session = c.get("session");
   if (!session?.user) {
-    return c.json({ message: "sign in required" }, 401);
+    return jsonError(c, 401, "sign in required");
   }
   try {
     await c.env.DB.prepare(
@@ -160,8 +156,8 @@ app.post("/notifications/read", async (c) => {
       .bind(session.user.id)
       .run();
     return c.json({ ok: true });
-  } catch (err) {
-    return c.json({ message: "failed to mark notifications read" }, 500);
+  } catch {
+    return jsonError(c, 500, "failed to mark notifications read");
   }
 });
 

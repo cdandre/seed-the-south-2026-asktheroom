@@ -10,6 +10,7 @@
 //   POST /api/answers/notifications/read   -> clear
 
 import { Hono } from "hono";
+import { escapeHtml } from "../utils.js";
 
 const app = new Hono();
 
@@ -386,15 +387,6 @@ const layout = (userName) => `<!doctype html>
   </script>
 </body>
 </html>`;
-
-function escapeHtml(s) {
-  return String(s == null ? "" : s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 app.get("/", (c) => {
   const session = c.get("session");

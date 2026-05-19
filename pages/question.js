@@ -11,17 +11,9 @@
 //   POST /api/answers/notifications/read    -> clear my badge on load
 
 import { Hono } from "hono";
+import { escapeHtml as escape } from "../utils.js";
 
 const app = new Hono();
-
-const escape = (s) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[c]);
 
 const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
