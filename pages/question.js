@@ -12,7 +12,7 @@
 //   POST /api/answers/notifications/read    -> clear my badge on load
 
 import { Hono } from "hono";
-import { escapeHtml as escape } from "../utils.js";
+import { escapeHtml as escape, sharedDarkStyles, markdownRendererSource } from "../utils.js";
 
 const app = new Hono();
 
@@ -26,22 +26,10 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
 <meta property="og:type" content="article" />
 <meta name="twitter:card" content="summary" />
 <style>
-  :root {
-    --bg: #0b0d10;
-    --panel: #14181d;
-    --panel-2: #1b2128;
-    --border: #2a323c;
-    --text: #e8edf2;
-    --muted: #8a96a3;
-    --amber: #f5a623;
-    --amber-2: #ffb845;
-    --danger: #ff5d5d;
-  }
-  * { box-sizing: border-box; }
+  ${sharedDarkStyles()}
+  /* Page-specific overrides: question detail uses system-ui font + slightly looser line-height. */
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-         margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
-         font-size: 17px; }
-  a { color: var(--amber); text-decoration: none; }
+         line-height: 1.5; }
   .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
   header { display: flex; align-items: center; justify-content: space-between;
            padding: 14px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
@@ -58,9 +46,6 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
           color: var(--muted); font-size: 13px; margin-bottom: 10px; }
   .author { font-weight: 600; color: var(--text); }
   .author.anon { color: var(--muted); font-style: italic; font-weight: 500; }
-  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px;
-         background: rgba(245, 166, 35, 0.13); color: var(--amber);
-         font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
   .qbody { font-size: 19px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
            color: var(--text); }
   .vote-row { display: flex; align-items: center; gap: 14px; margin-top: 16px;
@@ -178,34 +163,7 @@ app.get("/:id", async (c) => {
       })[c]);
     }
 
-    // Safe-by-construction markdown renderer. Input is ALREADY HTML-escaped.
-    // Tiny allowlist only: bold (double asterisk), italic (single asterisk),
-    // http(s) URLs, single newline -> br, double newline -> two brs.
-    // No markdown link syntax, no bullets, no headers, no code, no raw HTML.
-    // NOTE: this function body lives inside the outer template literal that
-    // builds the inline script tag, so every backslash in a regex literal must
-    // be written as \\\\ here so the rendered JS contains a single backslash.
-    function renderMarkdown(escapedText) {
-      if (escapedText == null) return '';
-      let s = String(escapedText);
-      // 1. URLs first.
-      s = s.replace(/\\bhttps?:\\/\\/[^\\s<*]+/g, (url) => {
-        const m = url.match(/[.,;:!?)\\]}'"]+$/);
-        let tail = '';
-        if (m) { tail = m[0]; url = url.slice(0, url.length - tail.length); }
-        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>' + tail;
-      });
-      // 2. Bold.
-      s = s.replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<strong>$1</strong>');
-      // 3. Italic.
-      s = s.replace(
-        /(^|[^*\\w<])\\*(?!\\s)([^*\\n<>]*[^\\s*<>]|[^\\s*<>])\\*(?!\\w)/g,
-        '$1<em>$2</em>'
-      );
-      // 4. Line breaks.
-      s = s.replace(/\\n\\n+/g, '<br><br>').replace(/\\n/g, '<br>');
-      return s;
-    }
+    ${markdownRendererSource()}
 
     function fmtTime(ts) {
       if (!ts) return '';

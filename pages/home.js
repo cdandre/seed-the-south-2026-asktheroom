@@ -11,7 +11,7 @@
 //   POST /api/answers/notifications/read   -> clear
 
 import { Hono } from "hono";
-import { escapeHtml } from "../utils.js";
+import { escapeHtml, sharedDarkStyles, markdownRendererSource } from "../utils.js";
 
 const app = new Hono();
 
@@ -29,22 +29,7 @@ const layout = (userName) => `<!doctype html>
   <meta property="og:type" content="website" />
   <title>Ask the Room</title>
   <style>
-    :root {
-      --bg: #0b0d10;
-      --panel: #14181d;
-      --panel-2: #1b2128;
-      --border: #2a323c;
-      --text: #e8edf2;
-      --muted: #8a96a3;
-      --amber: #f5a623;
-      --amber-2: #ffb845;
-      --danger: #ff5d5d;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 17px; line-height: 1.45; overflow-x: hidden; }
-    a { color: var(--amber); text-decoration: none; }
+    ${sharedDarkStyles()}
     header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 20px; border-bottom: 1px solid var(--border);
@@ -73,10 +58,6 @@ const layout = (userName) => `<!doctype html>
     }
     .signout:hover { color: var(--text); border-color: var(--muted); }
     main { max-width: 760px; margin: 0 auto; padding: 22px 18px 80px; }
-    .card {
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      padding: 16px; margin-bottom: 16px;
-    }
     .ask h2 { margin: 0 0 10px; font-size: 16px; color: var(--amber); letter-spacing: 0.3px; text-transform: uppercase; }
     .ask-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
     .ask-field label {
@@ -118,11 +99,6 @@ const layout = (userName) => `<!doctype html>
     .q-head { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 8px; flex-wrap: wrap; }
     .q-author { color: var(--text); font-weight: 600; }
     .q-author.anon { color: var(--muted); font-style: italic; font-weight: 500; }
-    .tag {
-      display: inline-block; padding: 2px 10px; border-radius: 999px;
-      background: rgba(245, 166, 35, 0.13); color: var(--amber);
-      font-size: 12px; font-weight: 700; letter-spacing: 0.3px;
-    }
     .q-body { color: var(--text); font-size: 16px; margin: 4px 0 12px; white-space: pre-wrap; word-break: break-word; }
     .q-foot { display: flex; align-items: center; gap: 18px; font-size: 15px; flex-wrap: wrap; }
     .upvote {
@@ -289,36 +265,7 @@ const layout = (userName) => `<!doctype html>
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
 
-    // Safe-by-construction markdown renderer. Input is ALREADY HTML-escaped.
-    // Tiny allowlist only: bold (double asterisk), italic (single asterisk),
-    // http(s) URLs, single newline -> br, double newline -> two brs.
-    // No markdown link syntax, no bullets, no headers, no code, no raw HTML.
-    // NOTE: this function body lives inside the outer template literal that
-    // builds the inline script tag, so every backslash in a regex literal must
-    // be written as \\\\ here so the rendered JS contains a single backslash.
-    function renderMarkdown(escapedText) {
-      if (escapedText == null) return "";
-      let s = String(escapedText);
-      // 1. URLs first (so bold/italic markers inside URLs do not get matched).
-      s = s.replace(/\\bhttps?:\\/\\/[^\\s<*]+/g, (url) => {
-        // Strip trailing punctuation that is usually sentence-glue, not URL.
-        const m = url.match(/[.,;:!?)\\]}'"]+$/);
-        let tail = "";
-        if (m) { tail = m[0]; url = url.slice(0, url.length - tail.length); }
-        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + "</a>" + tail;
-      });
-      // 2. Bold: double-asterisk pairs.
-      s = s.replace(/\\*\\*([^*\\n]+)\\*\\*/g, "<strong>$1</strong>");
-      // 3. Italic: single-asterisk pairs. Boundary guards reject bullet-style
-      //    leading asterisks and avoid touching inside already-inserted tags.
-      s = s.replace(
-        /(^|[^*\\w<])\\*(?!\\s)([^*\\n<>]*[^\\s*<>]|[^\\s*<>])\\*(?!\\w)/g,
-        "$1<em>$2</em>"
-      );
-      // 4. Line breaks.
-      s = s.replace(/\\n\\n+/g, "<br><br>").replace(/\\n/g, "<br>");
-      return s;
-    }
+    ${markdownRendererSource()}
 
     function timeAgo(ts) {
       if (!ts) return "";
