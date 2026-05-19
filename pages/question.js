@@ -111,6 +111,7 @@ app.get("/:id", async (c) => {
   const id = c.req.param("id");
   const session = c.get("session");
   const signedIn = !!session;
+  const currentUserId = session?.user?.id || null;
 
   const body = `
   <div id="qcard" class="card"><div class="empty">Loading question...</div></div>
@@ -134,6 +135,7 @@ app.get("/:id", async (c) => {
   <script>
     const QID = ${JSON.stringify(id)};
     const SIGNED_IN = ${signedIn ? "true" : "false"};
+    const CURRENT_USER_ID = ${JSON.stringify(currentUserId)};
 
     async function jsonFetch(url, opts = {}) {
       const r = await fetch(url, {
@@ -249,18 +251,57 @@ app.get("/:id", async (c) => {
         root.innerHTML = '<div class="empty">No answers yet. Be the first.</div>';
         return;
       }
-      root.innerHTML = list.map(a => {
-        const anon = a.anonymous;
-        const cls = anon ? 'author anon' : 'author';
-        const name = anon ? 'Anonymous' : (a.author_name || 'Anonymous');
-        return '<div class="answer">' +
+      // Sort: accepted answer first, then oldest-first for the rest.
+      const acceptedId = qState && qState.accepted_answer_id;
+      const sorted = [...list].sort((a, b) => {
+        if (a.id === acceptedId) return -1;
+        if (b.id === acceptedId) return 1;
+        return (a.created_at || 0) - (b.created_at || 0);
+      });
+      const isAsker = !!CURRENT_USER_ID && qState && qState.author_id === CURRENT_USER_ID;
+      root.innerHTML = sorted.map(a => {
+        const name = a.author_name || 'Someone';
+        const isAccepted = a.id === acceptedId;
+        const acceptBadge = isAccepted
+          ? '<span style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">&check; Accepted</span>'
+          : '';
+        const acceptBtn = (isAsker && !isAccepted)
+          ? '<button class="accept-btn" data-aid="' + esc(a.id) + '" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;">Accept this answer</button>'
+          : (isAsker && isAccepted)
+            ? '<button class="accept-btn unaccept-btn" data-aid="' + esc(a.id) + '" style="background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;">Unaccept</button>'
+            : '';
+        return '<div class="answer"' + (isAccepted ? ' style="border-color: rgba(46, 204, 113, 0.35);"' : '') + '>' +
           '<div class="meta">' +
-            '<span class="' + cls + '">' + esc(name) + '</span>' +
+            '<span class="author">' + esc(name) + '</span>' +
             '<span>' + esc(fmtTime(a.created_at)) + '</span>' +
+            acceptBadge +
           '</div>' +
           '<div class="answer-body">' + esc(a.body || a.text || '') + '</div>' +
+          (acceptBtn ? '<div style="margin-top: 12px;">' + acceptBtn + '</div>' : '') +
         '</div>';
       }).join('');
+
+      // Wire up accept / unaccept buttons.
+      root.querySelectorAll('.accept-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const aid = btn.getAttribute('data-aid');
+          const unaccepting = btn.classList.contains('unaccept-btn');
+          btn.disabled = true;
+          try {
+            await jsonFetch('/api/answers/' + encodeURIComponent(aid) + '/accept', {
+              method: 'POST',
+              body: JSON.stringify(unaccepting ? { unaccept: true } : {}),
+            });
+            // Reload question + answers to reflect new accepted state.
+            const q = await jsonFetch('/api/questions/' + encodeURIComponent(QID));
+            renderQuestion(q);
+            const a = await jsonFetch('/api/answers?question_id=' + encodeURIComponent(QID));
+            renderAnswers(Array.isArray(a) ? a : (a.answers || []));
+          } catch (e) {
+            alert(e.message || 'Accept failed');
+          } finally { btn.disabled = false; }
+        });
+      });
     }
 
     async function loadAll() {

@@ -25,12 +25,14 @@ function rowToItem(row) {
     body: row.body,
     tag: row.tag,
     anonymous,
+    author_id: row.author_id,
     author_name: anonymous ? null : row.author_name,
     created_at: row.created_at,
     upvote_count: Number(row.upvote_count) || 0,
     upvoter_names: upvoterNames,
     upvoters: upvoterNames.map((n) => ({ user_name: n })),
     answer_count: Number(row.answer_count) || 0,
+    accepted_answer_id: row.accepted_answer_id || null,
     upvoted: userUpvoted,
     user_upvoted: userUpvoted,
     has_upvoted: userUpvoted,
@@ -79,11 +81,13 @@ app.get("/", async (c) => {
       : `ORDER BY q.created_at DESC`;
     const whereClauses = [];
     if (tag) whereClauses.push("q.tag = ?");
-    if (q) whereClauses.push("(q.body LIKE ? OR q.author_name LIKE ?)");
+    // Search matches question body always; matches author name only on non-anonymous
+    // questions (prevents enumerating anonymous-question authors via search).
+    if (q) whereClauses.push("(q.body LIKE ? OR (q.anonymous = 0 AND q.author_name LIKE ?))");
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
-             q.created_at, q.last_answered_at,
+             q.created_at, q.last_answered_at, q.accepted_answer_id,
              (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
@@ -107,7 +111,8 @@ app.get("/", async (c) => {
     const { results } = await stmt.all();
     const items = (results || []).map(rowToItem);
     return c.json({ questions: items });
-  } catch {
+  } catch (e) {
+    console.error("GET /api/questions failed:", e);
     return jsonError(c, 500, "failed to load questions");
   }
 });
@@ -152,7 +157,8 @@ app.post("/", async (c) => {
     )
       .bind(id, authorId, authorName, anonymous ? 1 : 0, tag, text, now)
       .run();
-  } catch {
+  } catch (e) {
+    console.error("POST /api/questions failed:", e);
     return jsonError(c, 500, "failed to save question");
   }
 
@@ -163,12 +169,14 @@ app.post("/", async (c) => {
       body: text,
       tag,
       anonymous,
+      author_id: authorId,
       author_name: anonymous ? null : authorName,
       created_at: now,
       upvote_count: 0,
       upvoter_names: [],
       upvoters: [],
       answer_count: 0,
+      accepted_answer_id: null,
     },
     201
   );
@@ -184,7 +192,7 @@ app.get("/:id", async (c) => {
   try {
     const row = await c.env.DB.prepare(
       `SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
-              q.created_at, q.last_answered_at,
+              q.created_at, q.last_answered_at, q.accepted_answer_id,
               (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
               (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
               (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
@@ -212,7 +220,8 @@ app.get("/:id", async (c) => {
     item.user_upvoted = hasUpvoted;
     item.upvoted = hasUpvoted;
     return c.json(item);
-  } catch {
+  } catch (e) {
+    console.error("GET /api/questions/:id failed:", e);
     return jsonError(c, 500, "failed to load question");
   }
 });

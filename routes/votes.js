@@ -73,8 +73,11 @@ app.post("/", async (c) => {
       return jsonError(c, 404, "question not found");
     }
 
+    // INSERT OR IGNORE: if a concurrent request raced to insert the same upvote
+    // (UNIQUE constraint on (question_id, user_id) would otherwise throw), we
+    // silently no-op and return the current count. Net effect: idempotent toggle.
     await c.env.DB.prepare(
-      `INSERT INTO upvotes (id, question_id, user_id, user_name, created_at)
+      `INSERT OR IGNORE INTO upvotes (id, question_id, user_id, user_name, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     )
       .bind(newId(), questionId, userId, userName, Date.now())
@@ -82,7 +85,8 @@ app.post("/", async (c) => {
 
     const count = await countUpvotes(c.env.DB, questionId);
     return c.json({ upvoted: true, count });
-  } catch {
+  } catch (e) {
+    console.error("upvote toggle failed:", e);
     return jsonError(c, 500, "failed to toggle upvote");
   }
 });
@@ -104,7 +108,8 @@ app.get("/", async (c) => {
       .all();
     const upvoters = results ?? [];
     return c.json({ upvoters, count: upvoters.length });
-  } catch {
+  } catch (e) {
+    console.error("GET /api/votes failed:", e);
     return jsonError(c, 500, "failed to load upvoters");
   }
 });

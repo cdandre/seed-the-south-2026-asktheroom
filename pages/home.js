@@ -265,13 +265,16 @@ const layout = (userName) => `<!doctype html>
           ? '<span class="q-author anon">Anonymous</span>'
           : '<span class="q-author">' + escapeHtml(q.author_name || "Someone") + '</span>';
         const tag = q.tag ? '<span class="tag">' + escapeHtml(q.tag) + '</span>' : '';
+        const resolved = q.accepted_answer_id
+          ? '<span style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">&check; Resolved</span>'
+          : '';
         const upCount = q.upvote_count || 0;
         const ansCount = q.answer_count || 0;
         const upvoted = q.upvoted ? "on" : "";
         return ''
           + '<article class="card q" data-qid="' + escapeHtml(q.id) + '">'
           +   '<div class="q-head">'
-          +     author + tag + '<span>' + timeAgo(q.created_at) + '</span>'
+          +     author + tag + resolved + '<span>' + timeAgo(q.created_at) + '</span>'
           +   '</div>'
           +   '<div class="q-body">' + escapeHtml(q.body) + '</div>'
           +   '<div class="q-foot">'

@@ -33,7 +33,8 @@ app.get("/", async (c) => {
       .bind(questionId)
       .all();
     return c.json({ answers: results ?? [] });
-  } catch {
+  } catch (e) {
+    console.error("GET /api/answers failed:", e);
     return jsonError(c, 500, "failed to load answers");
   }
 });
@@ -117,7 +118,8 @@ app.post("/", async (c) => {
       },
       201,
     );
-  } catch {
+  } catch (e) {
+    console.error("POST /api/answers failed:", e);
     return jsonError(c, 500, "failed to post answer");
   }
 });
@@ -140,6 +142,44 @@ app.get("/notifications", async (c) => {
     return c.json({ notifications: results ?? [] });
   } catch {
     return jsonError(c, 500, "failed to load notifications");
+  }
+});
+
+// POST /api/answers/:answerId/accept
+// Marks an answer as the accepted answer for its question.
+// Only the question's author can accept. POST with empty body to accept;
+// posting with { unaccept: true } clears acceptance.
+app.post("/:answerId/accept", async (c) => {
+  const session = c.get("session");
+  if (!session?.user) return jsonError(c, 401, "sign in required");
+  const answerId = c.req.param("answerId");
+  if (!answerId) return jsonError(c, 400, "missing answer id");
+
+  let payload = {};
+  try { payload = await c.req.json(); } catch { payload = {}; }
+  const unaccept = !!payload?.unaccept;
+
+  try {
+    const answer = await c.env.DB.prepare(
+      `SELECT a.id, a.question_id, q.author_id AS question_author_id
+         FROM answers a
+         JOIN questions q ON q.id = a.question_id
+        WHERE a.id = ?`,
+    ).bind(answerId).first();
+
+    if (!answer) return jsonError(c, 404, "answer not found");
+    if (answer.question_author_id !== session.user.id) {
+      return jsonError(c, 403, "only the question author can accept an answer");
+    }
+
+    await c.env.DB.prepare(
+      `UPDATE questions SET accepted_answer_id = ? WHERE id = ?`,
+    ).bind(unaccept ? null : answerId, answer.question_id).run();
+
+    return c.json({ ok: true, question_id: answer.question_id, accepted_answer_id: unaccept ? null : answerId });
+  } catch (e) {
+    console.error("accept answer failed:", e);
+    return jsonError(c, 500, "failed to accept answer");
   }
 });
 
