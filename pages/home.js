@@ -43,7 +43,7 @@ const layout = (userName) => `<!doctype html>
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 17px; line-height: 1.45; }
+      font-size: 17px; line-height: 1.45; overflow-x: hidden; }
     a { color: var(--amber); text-decoration: none; }
     header {
       display: flex; align-items: center; justify-content: space-between;
@@ -109,7 +109,8 @@ const layout = (userName) => `<!doctype html>
     .submit:hover { background: var(--amber-2); }
     .submit:disabled { opacity: 0.6; cursor: progress; }
     .err { color: var(--danger); font-size: 14px; margin-top: 8px; min-height: 18px; }
-    .filter { display: flex; align-items: center; gap: 10px; margin: 8px 4px 14px; }
+    .filter { display: flex; align-items: center; gap: 10px; margin: 8px 4px 14px; flex-wrap: wrap; }
+    .filter > #search-input { flex: 1 1 100%; }
     .filter label { color: var(--muted); font-size: 14px; }
     .feed-status { color: var(--muted); font-size: 14px; padding: 24px; text-align: center; }
     .q { display: block; color: inherit; text-decoration: none; cursor: pointer; }
@@ -184,6 +185,11 @@ const layout = (userName) => `<!doctype html>
       header { padding: 10px 14px; }
       .brand { font-size: 20px; }
       footer.site { display: none; }
+      /* Collapse bell + signout text labels to icon-only on mobile. */
+      .bell .label-text, .signout .label-text { display: none; }
+      .bell { padding: 8px 10px; }
+      .signout { padding: 8px 10px; }
+      .hdr-right { gap: 8px; }
     }
   </style>
 </head>
@@ -192,11 +198,15 @@ const layout = (userName) => `<!doctype html>
     <div class="brand">Ask the Room</div>
     <div class="hdr-right">
       <div class="who">Hi, <b>${escapeHtml(userName)}</b></div>
-      <button id="bell" class="bell" type="button" title="Notifications">
-        <span>Notifications</span>
+      <button id="bell" class="bell" type="button" title="Notifications" aria-label="Notifications">
+        <span aria-hidden="true">🔔</span>
+        <span class="label-text">Notifications</span>
         <span class="badge" id="bell-badge">0</span>
       </button>
-      <button id="signout" class="signout" type="button">Sign out</button>
+      <button id="signout" class="signout" type="button" title="Sign out" aria-label="Sign out">
+        <span aria-hidden="true">⎋</span>
+        <span class="label-text">Sign out</span>
+      </button>
     </div>
   </header>
 
