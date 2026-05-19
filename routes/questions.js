@@ -21,6 +21,7 @@ function rowToItem(row) {
   const upvoterNames = csv
     ? String(csv).split(UPVOTER_SEP).filter(Boolean)
     : [];
+  const userUpvoted = !!row.user_upvoted_marker;
   return {
     id: row.id,
     text: row.body,
@@ -33,6 +34,9 @@ function rowToItem(row) {
     upvoter_names: upvoterNames,
     upvoters: upvoterNames.map((n) => ({ user_name: n })),
     answer_count: Number(row.answer_count) || 0,
+    upvoted: userUpvoted,
+    user_upvoted: userUpvoted,
+    has_upvoted: userUpvoted,
   };
 }
 
@@ -65,21 +69,30 @@ app.get("/", async (c) => {
   if (tag && !KNOWN_TAGS.includes(tag)) {
     return jsonError(c, 400, "unknown tag");
   }
+  const session = c.get("session");
+  const userId = session?.user?.id || null;
   try {
+    const userVoteSubquery = userId
+      ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
+      : `0`;
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
              q.created_at, q.last_answered_at,
              (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
-                FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv
+                FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
+             ${userVoteSubquery} AS user_upvoted_marker
         FROM questions q
        ${tag ? "WHERE q.tag = ?" : ""}
        ORDER BY q.created_at DESC
        LIMIT 100
     `;
-    const stmt = tag
-      ? c.env.DB.prepare(sql).bind(tag)
+    const binds = [];
+    if (userId) binds.push(userId);
+    if (tag) binds.push(tag);
+    const stmt = binds.length
+      ? c.env.DB.prepare(sql).bind(...binds)
       : c.env.DB.prepare(sql);
     const { results } = await stmt.all();
     const items = (results || []).map(rowToItem);
@@ -186,6 +199,8 @@ app.get("/:id", async (c) => {
 
     const item = rowToItem(row);
     item.has_upvoted = hasUpvoted;
+    item.user_upvoted = hasUpvoted;
+    item.upvoted = hasUpvoted;
     return c.json(item);
   } catch {
     return jsonError(c, 500, "failed to load question");
