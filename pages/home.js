@@ -514,7 +514,11 @@ const layout = (userName) => `<!doctype html>
       if (context) parts.push("**Context:** " + context);
       parts.push(ask);
       if (tried) parts.push("**What I've tried:** " + tried);
-      const body = parts.join("\n\n");
+      // NOTE: this script body lives inside a Hono c.html(\`...\`) template literal,
+      // so all client-side escape sequences must be double-escaped at the source
+      // level. "\\n\\n" here means the browser sees "\n\n" — a 2-character escape
+      // in the JS string literal, which becomes two newlines when parts.join runs.
+      const body = parts.join("\\n\\n");
       askBtn.disabled = true;
       const askBtnDefault = askBtn.textContent;
       askBtn.textContent = "Posting...";
