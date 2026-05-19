@@ -33,7 +33,8 @@ const html = `<!doctype html>
   .brand { font-weight: 800; font-size: 22px; color: var(--amber); letter-spacing: 0.2px; }
   .cta {
     background: var(--amber); color: #1a1408; padding: 10px 18px;
-    border-radius: 8px; font-weight: 800; font-size: 15px;
+    border-radius: 8px; font-weight: 800; font-size: 16px;
+    min-height: 44px; display: inline-flex; align-items: center;
   }
   .cta:hover { background: var(--amber-2); text-decoration: none; }
   h1 { font-size: 36px; line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.5px; }
@@ -86,7 +87,7 @@ const html = `<!doctype html>
 
   <div class="footer">
     <span><a href="/auth">Sign up / sign in</a></span>
-    <span><a href="https://github.com/cdandre/seed-the-south-2026-asktheroom">View source</a></span>
+    <span><a href="https://github.com/cdandre/seed-the-south-2026-asktheroom">Source</a></span>
   </div>
 </div>
 </body>

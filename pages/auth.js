@@ -67,7 +67,7 @@ const html = `<!doctype html>
   label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
   input {
     width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-    color: var(--text); font-size: 15px; padding: 12px 14px; border-radius: 9px;
+    color: var(--text); font-size: 16px; padding: 12px 14px; border-radius: 9px;
     outline: none; transition: border-color 0.15s, box-shadow 0.15s;
     font-family: inherit;
   }
@@ -95,15 +95,15 @@ const html = `<!doctype html>
   <div class="wrap">
     <div class="card">
       <div class="brand">
-        <span class="brand-dot"></span>
+        <span class="brand-dot" aria-hidden="true"></span>
         <span class="brand-name">Ask the Room</span>
       </div>
       <h1 id="title">Create your account</h1>
       <p class="sub" id="subtitle">Join the room. Ask, upvote, answer.</p>
 
       <div class="tabs" role="tablist">
-        <button class="tab active" id="tab-signup" type="button" role="tab">Sign up</button>
-        <button class="tab" id="tab-signin" type="button" role="tab">Sign in</button>
+        <button class="tab active" id="tab-signup" type="button" role="tab" aria-selected="true">Sign up</button>
+        <button class="tab" id="tab-signin" type="button" role="tab" aria-selected="false">Sign in</button>
       </div>
 
       <div class="error" id="error" role="alert"></div>
@@ -115,11 +115,11 @@ const html = `<!doctype html>
         </div>
         <div class="field-row">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@startup.co" />
+          <input id="email" name="email" type="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="email" required placeholder="you@startup.co" />
         </div>
         <div class="field-row">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" />
+          <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters" />
         </div>
         <button class="submit" type="submit" id="submit-btn">Create account</button>
       </form>
@@ -158,6 +158,8 @@ const html = `<!doctype html>
     if (mode === "signup") {
       tabSignup.classList.add("active");
       tabSignin.classList.remove("active");
+      tabSignup.setAttribute("aria-selected", "true");
+      tabSignin.setAttribute("aria-selected", "false");
       rowName.classList.remove("hidden");
       titleEl.textContent = "Create your account";
       subtitleEl.textContent = "Join the room. Ask, upvote, answer.";
@@ -167,6 +169,8 @@ const html = `<!doctype html>
     } else {
       tabSignin.classList.add("active");
       tabSignup.classList.remove("active");
+      tabSignin.setAttribute("aria-selected", "true");
+      tabSignup.setAttribute("aria-selected", "false");
       rowName.classList.add("hidden");
       titleEl.textContent = "Welcome back";
       subtitleEl.textContent = "Sign in to ask, upvote, and answer.";
