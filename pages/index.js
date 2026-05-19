@@ -9,7 +9,7 @@ const app = new Hono();
 
 app.get("/", (c) => {
   const session = c.get("session");
-  return c.redirect(session ? "/home" : "/auth");
+  return c.redirect(session ? "/home" : "/about");
 });
 
 export default app;

@@ -10,6 +10,7 @@ import votesRoute from "./routes/votes.js";
 
 import indexPage from "./pages/index.js";
 import authPage from "./pages/auth.js";
+import aboutPage from "./pages/about.js";
 import homePage from "./pages/home.js";
 import questionPage from "./pages/question.js";
 
@@ -35,6 +36,7 @@ app.route("/api/votes", votesRoute);
 // HTML pages
 app.route("/", indexPage);
 app.route("/auth", authPage);
+app.route("/about", aboutPage);
 app.route("/home", homePage);
 app.route("/q", questionPage);
 
