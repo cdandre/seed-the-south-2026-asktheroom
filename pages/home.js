@@ -172,12 +172,13 @@ const layout = (userName) => `<!doctype html>
     </section>
 
     <div class="filter">
+      <input id="search-input" type="search" placeholder="Search questions..." style="flex:1; min-width:160px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: inherit;" />
       <label for="tag-filter">Filter:</label>
       <select id="tag-filter">
         <option value="">All tags</option>
         ${TAGS.map((t) => `<option value="${t}">${t}</option>`).join("")}
       </select>
-      <label for="sort-by" style="margin-left: 12px;">Sort:</label>
+      <label for="sort-by">Sort:</label>
       <select id="sort-by">
         <option value="newest">Newest</option>
         <option value="top">Most upvoted</option>
@@ -222,11 +223,14 @@ const layout = (userName) => `<!doctype html>
     const feedEl = document.getElementById("feed");
     const tagFilter = document.getElementById("tag-filter");
     const sortBy = document.getElementById("sort-by");
+    const searchInput = document.getElementById("search-input");
 
     async function loadFeed() {
       const params = new URLSearchParams();
       if (tagFilter.value) params.set("tag", tagFilter.value);
       if (sortBy.value && sortBy.value !== "newest") params.set("sort", sortBy.value);
+      const qv = searchInput.value.trim();
+      if (qv) params.set("q", qv);
       const url = "/api/questions" + (params.toString() ? "?" + params.toString() : "");
       try {
         const items = await jsonFetch(url);
@@ -235,6 +239,13 @@ const layout = (userName) => `<!doctype html>
         feedEl.innerHTML = '<div class="feed-status">Could not load feed: ' + escapeHtml(e.message) + '</div>';
       }
     }
+
+    // Debounced search: 300ms after last keystroke.
+    let searchTimer = null;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadFeed, 300);
+    });
 
     function renderFeed(items) {
       if (!items.length) {

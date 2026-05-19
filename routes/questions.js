@@ -67,6 +67,7 @@ app.get("/", async (c) => {
     return jsonError(c, 400, "unknown tag");
   }
   const sort = c.req.query("sort") === "top" ? "top" : "newest";
+  const q = (c.req.query("q") || "").trim().slice(0, 100);
   const session = c.get("session");
   const userId = session?.user?.id || null;
   try {
@@ -76,6 +77,10 @@ app.get("/", async (c) => {
     const orderBy = sort === "top"
       ? `ORDER BY upvote_count DESC, q.created_at DESC`
       : `ORDER BY q.created_at DESC`;
+    const whereClauses = [];
+    if (tag) whereClauses.push("q.tag = ?");
+    if (q) whereClauses.push("(q.body LIKE ? OR q.author_name LIKE ?)");
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
              q.created_at, q.last_answered_at,
@@ -85,13 +90,17 @@ app.get("/", async (c) => {
                 FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
              ${userVoteSubquery} AS user_upvoted_marker
         FROM questions q
-       ${tag ? "WHERE q.tag = ?" : ""}
+       ${whereSql}
        ${orderBy}
        LIMIT 100
     `;
     const binds = [];
     if (userId) binds.push(userId);
     if (tag) binds.push(tag);
+    if (q) {
+      const pattern = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
+      binds.push(pattern, pattern);
+    }
     const stmt = binds.length
       ? c.env.DB.prepare(sql).bind(...binds)
       : c.env.DB.prepare(sql);
