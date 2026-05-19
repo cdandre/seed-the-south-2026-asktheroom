@@ -11,6 +11,14 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="description" content="A crowdsourced Q&amp;A app for founders. Post a question, upvote what matters, get answers. Built live at Seed the South 2026 by AI agents." />
+<meta property="og:title" content="Ask the Room" />
+<meta property="og:description" content="Crowdsourced Q&amp;A for founders. Built live at Seed the South 2026 by AI agents." />
+<meta property="og:url" content="https://asktheroom.org" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Ask the Room" />
+<meta name="twitter:description" content="Crowdsourced Q&amp;A for founders. Built live at Seed the South 2026 by AI agents." />
 <title>Ask the Room — Sign up</title>
 <style>
   :root {
