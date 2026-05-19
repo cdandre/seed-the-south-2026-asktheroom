@@ -155,7 +155,14 @@ const layout = (userName) => `<!doctype html>
     </div>
   </header>
 
-  <main>
+  <footer style="position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 16px; background: var(--panel); border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 18px; font-size: 13px; color: var(--muted); z-index: 5;">
+    <a href="/about" style="color: var(--muted);">About</a>
+    <a href="https://github.com/cdandre/seed-the-south-2026-asktheroom" target="_blank" rel="noopener" style="color: var(--muted);">Source</a>
+    <span>·</span>
+    <span>Built live at <span style="color: var(--amber);">Seed the South 2026</span></span>
+  </footer>
+
+  <main style="padding-bottom: 60px;">
     <section class="card ask">
       <h2>Ask the room</h2>
       <form id="ask-form">
