@@ -27,6 +27,11 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)} — Ask the Room</title>
+<meta name="description" content="A crowdsourced Q&amp;A app for founders. Built live at Seed the South 2026 by AI agents." />
+<meta property="og:title" content="${escape(title)} — Ask the Room" />
+<meta property="og:description" content="Crowdsourced Q&amp;A for founders. Built live at Seed the South 2026 by AI agents." />
+<meta property="og:type" content="article" />
+<meta name="twitter:card" content="summary" />
 <style>
   :root {
     --bg: #0b0d10;
