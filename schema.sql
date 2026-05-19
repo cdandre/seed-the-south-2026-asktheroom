@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS upvotes (
 );
 CREATE INDEX IF NOT EXISTS idx_upvotes_question_id ON upvotes(question_id);
 
+CREATE TABLE IF NOT EXISTS answer_upvotes (
+  id TEXT PRIMARY KEY,
+  answer_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(answer_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_answer_upvotes_answer_id ON answer_upvotes(answer_id);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,

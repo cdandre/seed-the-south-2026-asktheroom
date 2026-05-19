@@ -114,4 +114,105 @@ app.get("/", async (c) => {
   }
 });
 
+// --- Answer upvotes -------------------------------------------------------
+// Mirrors the question-upvote pattern above, but keyed on answer_id and
+// backed by the answer_upvotes table. Anyone (including the answer's own
+// author) can upvote an answer — that's standard Q&A behavior.
+
+async function countAnswerUpvotes(db, answerId) {
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS n FROM answer_upvotes WHERE answer_id = ?`)
+    .bind(answerId)
+    .first();
+  return row?.n ?? 0;
+}
+
+// POST /api/votes/answer   body: { answer_id }
+app.post("/answer", async (c) => {
+  const session = c.get("session");
+  if (!session?.user) {
+    return jsonError(c, 401, "sign in required");
+  }
+
+  let payload;
+  try {
+    payload = await c.req.json();
+  } catch {
+    return jsonError(c, 400, "invalid json body");
+  }
+
+  const answerId = typeof payload?.answer_id === "string" ? payload.answer_id.trim() : "";
+  if (!answerId) {
+    return jsonError(c, 400, "answer_id is required");
+  }
+
+  const userId = session.user.id;
+  const userName = session.user.name || session.user.email || "Someone";
+
+  try {
+    const exists = await c.env.DB.prepare(
+      `SELECT id FROM answer_upvotes WHERE answer_id = ? AND user_id = ?`,
+    )
+      .bind(answerId, userId)
+      .first();
+
+    if (exists) {
+      await c.env.DB.prepare(
+        `DELETE FROM answer_upvotes WHERE answer_id = ? AND user_id = ?`,
+      )
+        .bind(answerId, userId)
+        .run();
+      const count = await countAnswerUpvotes(c.env.DB, answerId);
+      return c.json({ upvoted: false, count });
+    }
+
+    // Confirm answer exists before inserting (cheap guard, mirrors question check).
+    const answer = await c.env.DB.prepare(
+      `SELECT id FROM answers WHERE id = ?`,
+    )
+      .bind(answerId)
+      .first();
+    if (!answer) {
+      return jsonError(c, 404, "answer not found");
+    }
+
+    // INSERT OR IGNORE: race-safe idempotent toggle (UNIQUE on answer_id+user_id).
+    await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO answer_upvotes (id, answer_id, user_id, user_name, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(newId(), answerId, userId, userName, Date.now())
+      .run();
+
+    const count = await countAnswerUpvotes(c.env.DB, answerId);
+    return c.json({ upvoted: true, count });
+  } catch (e) {
+    console.error("answer upvote toggle failed:", e);
+    return jsonError(c, 500, "failed to toggle answer upvote");
+  }
+});
+
+// GET /api/votes/answer?answer_id=...
+app.get("/answer", async (c) => {
+  const answerId = c.req.query("answer_id");
+  if (!answerId) {
+    return jsonError(c, 400, "answer_id is required");
+  }
+  try {
+    const { results } = await c.env.DB.prepare(
+      `SELECT user_id, user_name, created_at
+         FROM answer_upvotes
+        WHERE answer_id = ?
+        ORDER BY created_at ASC`,
+    )
+      .bind(answerId)
+      .all();
+    const upvoters = results ?? [];
+    return c.json({ upvoters, count: upvoters.length });
+  } catch (e) {
+    console.error("GET /api/votes/answer failed:", e);
+    return jsonError(c, 500, "failed to load answer upvoters");
+  }
+});
+
 export default app;

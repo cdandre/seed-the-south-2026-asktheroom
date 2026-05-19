@@ -251,17 +251,14 @@ app.get("/:id", async (c) => {
         root.innerHTML = '<div class="empty">No answers yet. Be the first.</div>';
         return;
       }
-      // Sort: accepted answer first, then oldest-first for the rest.
+      // Trust server ordering (accepted first, then upvote_count DESC, then created_at ASC).
       const acceptedId = qState && qState.accepted_answer_id;
-      const sorted = [...list].sort((a, b) => {
-        if (a.id === acceptedId) return -1;
-        if (b.id === acceptedId) return 1;
-        return (a.created_at || 0) - (b.created_at || 0);
-      });
       const isAsker = !!CURRENT_USER_ID && qState && qState.author_id === CURRENT_USER_ID;
-      root.innerHTML = sorted.map(a => {
+      root.innerHTML = list.map(a => {
         const name = a.author_name || 'Someone';
         const isAccepted = a.id === acceptedId;
+        const upCount = Number(a.upvote_count) || 0;
+        const upvoted = !!a.user_upvoted;
         const acceptBadge = isAccepted
           ? '<span style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">&check; Accepted</span>'
           : '';
@@ -270,6 +267,13 @@ app.get("/:id", async (c) => {
           : (isAsker && isAccepted)
             ? '<button class="accept-btn unaccept-btn" data-aid="' + esc(a.id) + '" style="background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;">Unaccept</button>'
             : '';
+        const upvoteBtn =
+          '<button class="ans-vote-btn vote-btn' + (upvoted ? ' upvoted' : '') + '" data-aid="' + esc(a.id) + '" style="padding: 6px 12px; font-size: 13px;">' +
+            (upvoted ? '&#9650; Upvoted' : '&#9650; Upvote') +
+          '</button>' +
+          '<span class="ans-vote-count" data-aid="' + esc(a.id) + '" style="font-size: 13px; color: var(--muted); margin-left: 8px;">' +
+            upCount + ' upvote' + (upCount === 1 ? '' : 's') +
+          '</span>';
         return '<div class="answer"' + (isAccepted ? ' style="border-color: rgba(46, 204, 113, 0.35);"' : '') + '>' +
           '<div class="meta">' +
             '<span class="author">' + esc(name) + '</span>' +
@@ -277,7 +281,10 @@ app.get("/:id", async (c) => {
             acceptBadge +
           '</div>' +
           '<div class="answer-body">' + esc(a.body || a.text || '') + '</div>' +
-          (acceptBtn ? '<div style="margin-top: 12px;">' + acceptBtn + '</div>' : '') +
+          '<div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">' +
+            upvoteBtn +
+            (acceptBtn ? '<span style="flex: 1;"></span>' + acceptBtn : '') +
+          '</div>' +
         '</div>';
       }).join('');
 
@@ -300,6 +307,34 @@ app.get("/:id", async (c) => {
           } catch (e) {
             alert(e.message || 'Accept failed');
           } finally { btn.disabled = false; }
+        });
+      });
+
+      // Wire up per-answer upvote buttons.
+      root.querySelectorAll('.ans-vote-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!SIGNED_IN) {
+            location.href = '/auth?from=/q/' + encodeURIComponent(QID);
+            return;
+          }
+          const aid = btn.getAttribute('data-aid');
+          btn.disabled = true;
+          try {
+            const r = await jsonFetch('/api/votes/answer', {
+              method: 'POST',
+              body: JSON.stringify({ answer_id: aid }),
+            });
+            // Reload answers — order may change (top-voted bubbles up).
+            const a = await jsonFetch('/api/answers?question_id=' + encodeURIComponent(QID));
+            renderAnswers(Array.isArray(a) ? a : (a.answers || []));
+          } catch (e) {
+            if (e.status === 401) {
+              location.href = '/auth?from=/q/' + encodeURIComponent(QID);
+              return;
+            }
+            alert(e.message || 'Upvote failed');
+            btn.disabled = false;
+          }
         });
       });
     }

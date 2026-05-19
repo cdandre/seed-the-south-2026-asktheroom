@@ -18,21 +18,38 @@ const app = new Hono();
 const MAX_BODY = 1000;
 
 // GET /api/answers?question_id=...
+// Sort order: accepted answer first, then most-upvoted, then oldest as tiebreaker.
+// Each row includes upvote_count and (when signed in) user_upvoted (0/1) so the
+// client can render the per-answer upvote button without a second round trip.
 app.get("/", async (c) => {
   const questionId = c.req.query("question_id");
   if (!questionId) {
     return jsonError(c, 400, "question_id is required");
   }
+  const session = c.get("session");
+  const userId = session?.user?.id || null;
   try {
-    const { results } = await c.env.DB.prepare(
-      `SELECT id, question_id, author_id, author_name, body, created_at
-         FROM answers
-        WHERE question_id = ?
-        ORDER BY created_at ASC`,
-    )
-      .bind(questionId)
-      .all();
-    return c.json({ answers: results ?? [] });
+    const userVoteSubquery = userId
+      ? `(SELECT 1 FROM answer_upvotes au WHERE au.answer_id = a.id AND au.user_id = ?)`
+      : `0`;
+    const sql = `
+      SELECT a.id, a.question_id, a.author_id, a.author_name, a.body, a.created_at,
+             (SELECT COUNT(*) FROM answer_upvotes au2 WHERE au2.answer_id = a.id) AS upvote_count,
+             ${userVoteSubquery} AS user_upvoted
+        FROM answers a
+       WHERE a.question_id = ?
+       ORDER BY (a.id = (SELECT accepted_answer_id FROM questions WHERE id = a.question_id)) DESC,
+                upvote_count DESC,
+                a.created_at ASC
+    `;
+    const binds = userId ? [userId, questionId] : [questionId];
+    const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
+    const answers = (results ?? []).map((row) => ({
+      ...row,
+      upvote_count: Number(row.upvote_count) || 0,
+      user_upvoted: !!row.user_upvoted,
+    }));
+    return c.json({ answers });
   } catch (e) {
     console.error("GET /api/answers failed:", e);
     return jsonError(c, 500, "failed to load answers");
