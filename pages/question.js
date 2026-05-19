@@ -178,6 +178,35 @@ app.get("/:id", async (c) => {
       })[c]);
     }
 
+    // Safe-by-construction markdown renderer. Input is ALREADY HTML-escaped.
+    // Tiny allowlist only: bold (double asterisk), italic (single asterisk),
+    // http(s) URLs, single newline -> br, double newline -> two brs.
+    // No markdown link syntax, no bullets, no headers, no code, no raw HTML.
+    // NOTE: this function body lives inside the outer template literal that
+    // builds the inline script tag, so every backslash in a regex literal must
+    // be written as \\\\ here so the rendered JS contains a single backslash.
+    function renderMarkdown(escapedText) {
+      if (escapedText == null) return '';
+      let s = String(escapedText);
+      // 1. URLs first.
+      s = s.replace(/\\bhttps?:\\/\\/[^\\s<*]+/g, (url) => {
+        const m = url.match(/[.,;:!?)\\]}'"]+$/);
+        let tail = '';
+        if (m) { tail = m[0]; url = url.slice(0, url.length - tail.length); }
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>' + tail;
+      });
+      // 2. Bold.
+      s = s.replace(/\\*\\*([^*\\n]+)\\*\\*/g, '<strong>$1</strong>');
+      // 3. Italic.
+      s = s.replace(
+        /(^|[^*\\w<])\\*(?!\\s)([^*\\n<>]*[^\\s*<>]|[^\\s*<>])\\*(?!\\w)/g,
+        '$1<em>$2</em>'
+      );
+      // 4. Line breaks.
+      s = s.replace(/\\n\\n+/g, '<br><br>').replace(/\\n/g, '<br>');
+      return s;
+    }
+
     function fmtTime(ts) {
       if (!ts) return '';
       const d = new Date(typeof ts === 'number' ? ts : Date.parse(ts));
@@ -213,7 +242,7 @@ app.get("/:id", async (c) => {
           (q.tag ? '<span class="tag">' + esc(q.tag) + '</span>' : '') +
           '<span>' + esc(fmtTime(q.created_at)) + '</span>' +
         '</div>' +
-        '<div class="qbody">' + esc(q.body || q.text || '') + '</div>' +
+        '<div class="qbody">' + renderMarkdown(esc(q.body || q.text || '')) + '</div>' +
         '<div class="vote-row">' +
           '<button id="votebtn" class="vote-btn' + (myVote ? ' upvoted' : '') + '"' +
             ' aria-label="Upvote question (' + count + ' upvote' + (count === 1 ? '' : 's') + ')"' +
@@ -356,7 +385,7 @@ app.get("/:id", async (c) => {
             '<span>' + esc(fmtTime(a.created_at)) + '</span>' +
             acceptBadge +
           '</div>' +
-          '<div class="answer-body">' + esc(a.body || a.text || '') + '</div>' +
+          '<div class="answer-body">' + renderMarkdown(esc(a.body || a.text || '')) + '</div>' +
           '<div style="margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
             upvoteBtn +
             (acceptBtn ? '<span style="flex: 1;"></span>' + acceptBtn : '') +

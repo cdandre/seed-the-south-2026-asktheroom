@@ -279,6 +279,37 @@ const layout = (userName) => `<!doctype html>
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
 
+    // Safe-by-construction markdown renderer. Input is ALREADY HTML-escaped.
+    // Tiny allowlist only: bold (double asterisk), italic (single asterisk),
+    // http(s) URLs, single newline -> br, double newline -> two brs.
+    // No markdown link syntax, no bullets, no headers, no code, no raw HTML.
+    // NOTE: this function body lives inside the outer template literal that
+    // builds the inline script tag, so every backslash in a regex literal must
+    // be written as \\\\ here so the rendered JS contains a single backslash.
+    function renderMarkdown(escapedText) {
+      if (escapedText == null) return "";
+      let s = String(escapedText);
+      // 1. URLs first (so bold/italic markers inside URLs do not get matched).
+      s = s.replace(/\\bhttps?:\\/\\/[^\\s<*]+/g, (url) => {
+        // Strip trailing punctuation that is usually sentence-glue, not URL.
+        const m = url.match(/[.,;:!?)\\]}'"]+$/);
+        let tail = "";
+        if (m) { tail = m[0]; url = url.slice(0, url.length - tail.length); }
+        return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + "</a>" + tail;
+      });
+      // 2. Bold: double-asterisk pairs.
+      s = s.replace(/\\*\\*([^*\\n]+)\\*\\*/g, "<strong>$1</strong>");
+      // 3. Italic: single-asterisk pairs. Boundary guards reject bullet-style
+      //    leading asterisks and avoid touching inside already-inserted tags.
+      s = s.replace(
+        /(^|[^*\\w<])\\*(?!\\s)([^*\\n<>]*[^\\s*<>]|[^\\s*<>])\\*(?!\\w)/g,
+        "$1<em>$2</em>"
+      );
+      // 4. Line breaks.
+      s = s.replace(/\\n\\n+/g, "<br><br>").replace(/\\n/g, "<br>");
+      return s;
+    }
+
     function timeAgo(ts) {
       if (!ts) return "";
       const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
@@ -359,7 +390,7 @@ const layout = (userName) => `<!doctype html>
           +   '<div class="q-head">'
           +     author + tag + resolved + '<span>' + timeAgo(q.created_at) + '</span>'
           +   '</div>'
-          +   '<div class="q-body">' + escapeHtml(q.body) + '</div>'
+          +   '<div class="q-body">' + renderMarkdown(escapeHtml(q.body)) + '</div>'
           +   '<div class="q-foot">'
           +     '<button type="button" class="upvote ' + upvoted + '" data-act="upvote" aria-label="Upvote (' + upCount + ')">'
           +       '<span class="arrow">&#9650;</span><span class="count">' + upCount + '</span>'
