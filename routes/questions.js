@@ -69,12 +69,16 @@ app.get("/", async (c) => {
   if (tag && !KNOWN_TAGS.includes(tag)) {
     return jsonError(c, 400, "unknown tag");
   }
+  const sort = c.req.query("sort") === "top" ? "top" : "newest";
   const session = c.get("session");
   const userId = session?.user?.id || null;
   try {
     const userVoteSubquery = userId
       ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
       : `0`;
+    const orderBy = sort === "top"
+      ? `ORDER BY upvote_count DESC, q.created_at DESC`
+      : `ORDER BY q.created_at DESC`;
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
              q.created_at, q.last_answered_at,
@@ -85,7 +89,7 @@ app.get("/", async (c) => {
              ${userVoteSubquery} AS user_upvoted_marker
         FROM questions q
        ${tag ? "WHERE q.tag = ?" : ""}
-       ORDER BY q.created_at DESC
+       ${orderBy}
        LIMIT 100
     `;
     const binds = [];

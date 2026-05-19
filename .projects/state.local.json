@@ -52,7 +52,7 @@
       "configuration": {},
       "createdAt": "2026-05-17T11:30:29.041Z",
       "lastRevealedAt": "2026-05-17T11:30:29.288Z",
-      "lastStatus": "complete",
+      "lastStatus": "errored",
       "name": "cloudflare-plan",
       "providerId": "prvdr_61UQRSWMdrciFdBNs5Ipc",
       "providerName": "Cloudflare",

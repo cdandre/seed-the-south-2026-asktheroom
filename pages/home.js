@@ -171,6 +171,11 @@ const layout = (userName) => `<!doctype html>
         <option value="">All tags</option>
         ${TAGS.map((t) => `<option value="${t}">${t}</option>`).join("")}
       </select>
+      <label for="sort-by" style="margin-left: 12px;">Sort:</label>
+      <select id="sort-by">
+        <option value="newest">Newest</option>
+        <option value="top">Most upvoted</option>
+      </select>
     </div>
 
     <div id="feed" class="feed">
@@ -210,10 +215,13 @@ const layout = (userName) => `<!doctype html>
 
     const feedEl = document.getElementById("feed");
     const tagFilter = document.getElementById("tag-filter");
+    const sortBy = document.getElementById("sort-by");
 
     async function loadFeed() {
-      const tag = tagFilter.value;
-      const url = "/api/questions" + (tag ? "?tag=" + encodeURIComponent(tag) : "");
+      const params = new URLSearchParams();
+      if (tagFilter.value) params.set("tag", tagFilter.value);
+      if (sortBy.value && sortBy.value !== "newest") params.set("sort", sortBy.value);
+      const url = "/api/questions" + (params.toString() ? "?" + params.toString() : "");
       try {
         const items = await jsonFetch(url);
         renderFeed(Array.isArray(items) ? items : (items.questions || []));
@@ -303,6 +311,7 @@ const layout = (userName) => `<!doctype html>
     }
 
     tagFilter.addEventListener("change", loadFeed);
+    sortBy.addEventListener("change", loadFeed);
 
     const askForm = document.getElementById("ask-form");
     const askErr = document.getElementById("ask-err");
