@@ -44,7 +44,11 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
   .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
   header { display: flex; align-items: center; justify-content: space-between;
            padding: 14px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
-  header a.back { color: var(--muted); text-decoration: none; font-size: 15px; }
+  header a.back {
+    color: var(--muted); text-decoration: none; font-size: 15px;
+    padding: 12px 8px 12px 4px; min-height: 44px;
+    display: inline-flex; align-items: center;
+  }
   header a.back:hover { color: var(--text); }
   header .brand { font-weight: 800; font-size: 20px; color: var(--amber); letter-spacing: 0.2px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
@@ -62,7 +66,8 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
               padding-top: 14px; border-top: 1px solid var(--border); }
   .vote-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
               padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
-              font-size: 15px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+              font-size: 15px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+              min-width: 110px; min-height: 44px; justify-content: center; }
   .vote-btn:hover { border-color: var(--amber); }
   .vote-btn.upvoted { background: rgba(245, 166, 35, 0.15); border-color: var(--amber); color: var(--amber); }
   .vote-count { font-weight: 600; font-size: 14px; cursor: pointer; user-select: none;
@@ -80,10 +85,18 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
   .answer .meta { margin-bottom: 6px; }
   .answer-body { white-space: pre-wrap; word-wrap: break-word; font-size: 15px; color: var(--text); }
   .empty { color: var(--muted); font-style: italic; padding: 14px; text-align: center; }
+  .empty.first { color: var(--amber); }
+  .accept-btn {
+    min-height: 44px; font-size: 14px !important; padding: 10px 16px !important;
+  }
+  .ans-vote-btn {
+    min-height: 44px; min-width: 120px; font-size: 14px !important; padding: 10px 14px !important;
+    justify-content: center;
+  }
   .form-card textarea { width: 100%; min-height: 100px; padding: 12px;
                         background: var(--bg); color: var(--text);
                         border: 1px solid var(--border); border-radius: 8px;
-                        font: inherit; font-size: 15px; resize: vertical; }
+                        font: inherit; font-size: 16px; resize: vertical; }
   .form-card textarea:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
   .form-foot { display: flex; justify-content: space-between; align-items: center;
                margin-top: 8px; }
@@ -186,12 +199,15 @@ app.get("/:id", async (c) => {
         '</div>' +
         '<div class="qbody">' + esc(q.body || q.text || '') + '</div>' +
         '<div class="vote-row">' +
-          '<button id="votebtn" class="vote-btn' + (myVote ? ' upvoted' : '') + '">' +
-            (myVote ? 'Upvoted' : 'Upvote') +
+          '<button id="votebtn" class="vote-btn' + (myVote ? ' upvoted' : '') + '"' +
+            ' aria-label="Upvote question (' + count + ' upvote' + (count === 1 ? '' : 's') + ')"' +
+            ' aria-pressed="' + (myVote ? 'true' : 'false') + '">' +
+            '▲ ' + count +
           '</button>' +
           '<span class="vote-count" id="vcount" title="Tap to see who upvoted">' +
             count + ' upvote' + (count === 1 ? '' : 's') +
           '</span>' +
+          '<span id="verr" class="err" style="margin-top: 0; margin-left: auto;"></span>' +
         '</div>' +
         '<div id="upvoters" class="upvoters hidden"></div>';
       document.getElementById('qcard').innerHTML = html;
@@ -223,6 +239,8 @@ app.get("/:id", async (c) => {
         return;
       }
       const btn = document.getElementById('votebtn');
+      const errEl = document.getElementById('verr');
+      if (errEl) errEl.textContent = '';
       btn.disabled = true;
       try {
         const r = await jsonFetch('/api/votes', {
@@ -238,7 +256,8 @@ app.get("/:id", async (c) => {
           location.href = '/auth?from=/q/' + encodeURIComponent(QID);
           return;
         }
-        alert(e.message || 'Vote failed');
+        const errEl2 = document.getElementById('verr');
+        if (errEl2) errEl2.textContent = e.message || 'Vote failed';
       } finally {
         const b = document.getElementById('votebtn');
         if (b) b.disabled = false;
@@ -248,7 +267,7 @@ app.get("/:id", async (c) => {
     function renderAnswers(list) {
       const root = document.getElementById('answers');
       if (!list || list.length === 0) {
-        root.innerHTML = '<div class="empty">No answers yet. Be the first.</div>';
+        root.innerHTML = '<div class="empty first">No answers yet. Be the first.</div>';
         return;
       }
       // Trust server ordering (accepted first, then upvote_count DESC, then created_at ASC).
@@ -263,17 +282,20 @@ app.get("/:id", async (c) => {
           ? '<span style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px;">&check; Accepted</span>'
           : '';
         const acceptBtn = (isAsker && !isAccepted)
-          ? '<button class="accept-btn" data-aid="' + esc(a.id) + '" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;">Accept this answer</button>'
+          ? '<button class="accept-btn" data-aid="' + esc(a.id) + '" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 8px; cursor: pointer;">Accept this answer</button>'
           : (isAsker && isAccepted)
-            ? '<button class="accept-btn unaccept-btn" data-aid="' + esc(a.id) + '" style="background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;">Unaccept</button>'
+            ? '<button class="accept-btn unaccept-btn" data-aid="' + esc(a.id) + '" style="background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; cursor: pointer;">Unaccept</button>'
             : '';
         const upvoteBtn =
-          '<button class="ans-vote-btn vote-btn' + (upvoted ? ' upvoted' : '') + '" data-aid="' + esc(a.id) + '" style="padding: 6px 12px; font-size: 13px;">' +
-            (upvoted ? '&#9650; Upvoted' : '&#9650; Upvote') +
+          '<button class="ans-vote-btn vote-btn' + (upvoted ? ' upvoted' : '') + '" data-aid="' + esc(a.id) + '"' +
+            ' aria-label="Upvote answer (' + upCount + ' upvote' + (upCount === 1 ? '' : 's') + ')"' +
+            ' aria-pressed="' + (upvoted ? 'true' : 'false') + '">' +
+            '▲ ' + upCount +
           '</button>' +
-          '<span class="ans-vote-count" data-aid="' + esc(a.id) + '" style="font-size: 13px; color: var(--muted); margin-left: 8px;">' +
-            upCount + ' upvote' + (upCount === 1 ? '' : 's') +
-          '</span>';
+          '<span class="ans-vote-count" data-aid="' + esc(a.id) + '" style="font-size: 14px; color: var(--muted); margin-left: 8px;">' +
+            'upvote' + (upCount === 1 ? '' : 's') +
+          '</span>' +
+          '<span class="err" data-ans-err="' + esc(a.id) + '" style="margin-top: 0; margin-left: 8px; min-height: 0;"></span>';
         return '<div class="answer"' + (isAccepted ? ' style="border-color: rgba(46, 204, 113, 0.35);"' : '') + '>' +
           '<div class="meta">' +
             '<span class="author">' + esc(name) + '</span>' +
@@ -281,7 +303,7 @@ app.get("/:id", async (c) => {
             acceptBadge +
           '</div>' +
           '<div class="answer-body">' + esc(a.body || a.text || '') + '</div>' +
-          '<div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">' +
+          '<div style="margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
             upvoteBtn +
             (acceptBtn ? '<span style="flex: 1;"></span>' + acceptBtn : '') +
           '</div>' +
@@ -293,6 +315,8 @@ app.get("/:id", async (c) => {
         btn.addEventListener('click', async () => {
           const aid = btn.getAttribute('data-aid');
           const unaccepting = btn.classList.contains('unaccept-btn');
+          const errEl = root.querySelector('[data-ans-err="' + (window.CSS && CSS.escape ? CSS.escape(aid) : aid) + '"]');
+          if (errEl) errEl.textContent = '';
           btn.disabled = true;
           try {
             await jsonFetch('/api/answers/' + encodeURIComponent(aid) + '/accept', {
@@ -305,8 +329,9 @@ app.get("/:id", async (c) => {
             const a = await jsonFetch('/api/answers?question_id=' + encodeURIComponent(QID));
             renderAnswers(Array.isArray(a) ? a : (a.answers || []));
           } catch (e) {
-            alert(e.message || 'Accept failed');
-          } finally { btn.disabled = false; }
+            if (errEl) errEl.textContent = e.message || 'Accept failed';
+            btn.disabled = false;
+          }
         });
       });
 
@@ -318,6 +343,8 @@ app.get("/:id", async (c) => {
             return;
           }
           const aid = btn.getAttribute('data-aid');
+          const errEl = root.querySelector('[data-ans-err="' + (window.CSS && CSS.escape ? CSS.escape(aid) : aid) + '"]');
+          if (errEl) errEl.textContent = '';
           btn.disabled = true;
           try {
             const r = await jsonFetch('/api/votes/answer', {
@@ -332,7 +359,7 @@ app.get("/:id", async (c) => {
               location.href = '/auth?from=/q/' + encodeURIComponent(QID);
               return;
             }
-            alert(e.message || 'Upvote failed');
+            if (errEl) errEl.textContent = e.message || 'Upvote failed';
             btn.disabled = false;
           }
         });
