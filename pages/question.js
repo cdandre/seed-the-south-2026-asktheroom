@@ -28,57 +28,77 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)} — Ask the Room</title>
 <style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --panel-2: #1b2128;
+    --border: #2a323c;
+    --text: #e8edf2;
+    --muted: #8a96a3;
+    --amber: #f5a623;
+    --amber-2: #ffb845;
+    --danger: #ff5d5d;
+  }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-         margin: 0; background: #f7f7f5; color: #1a1a1a; line-height: 1.5; }
+         margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
+         font-size: 17px; }
+  a { color: var(--amber); text-decoration: none; }
   .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 20px; }
-  header a.back { color: #4a4a4a; text-decoration: none; font-size: 15px; }
-  header a.back:hover { color: #000; }
-  header .brand { font-weight: 700; font-size: 18px; }
-  .card { background: #fff; border: 1px solid #e2e2dc; border-radius: 12px; padding: 18px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.03); margin-bottom: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between;
+           padding: 14px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  header a.back { color: var(--muted); text-decoration: none; font-size: 15px; }
+  header a.back:hover { color: var(--text); }
+  header .brand { font-weight: 800; font-size: 20px; color: var(--amber); letter-spacing: 0.2px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+          padding: 18px; margin-bottom: 16px; }
   .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-          color: #6a6a6a; font-size: 13px; margin-bottom: 10px; }
-  .author { font-weight: 600; color: #1a1a1a; }
-  .author.anon { color: #8a8a8a; font-style: italic; font-weight: 500; }
-  .tag { background: #eef3ff; color: #2c4fb8; padding: 2px 10px; border-radius: 999px;
-         font-size: 12px; font-weight: 600; }
-  .qbody { font-size: 19px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
-  .vote-row { display: flex; align-items: center; gap: 12px; margin-top: 16px;
-              padding-top: 14px; border-top: 1px solid #f0efeb; }
-  .vote-btn { background: #fff; border: 1.5px solid #2c4fb8; color: #2c4fb8;
-              padding: 8px 16px; border-radius: 999px; font-weight: 600; cursor: pointer;
-              font-size: 15px; transition: all 0.15s; }
-  .vote-btn:hover { background: #eef3ff; }
-  .vote-btn.upvoted { background: #2c4fb8; color: #fff; }
-  .vote-count { font-weight: 700; font-size: 16px; cursor: pointer; user-select: none; }
-  .vote-count:hover { text-decoration: underline; }
-  .upvoters { margin-top: 12px; padding: 10px 12px; background: #f7f7f5;
-              border-radius: 8px; font-size: 13px; color: #4a4a4a; }
+          color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .author { font-weight: 600; color: var(--text); }
+  .author.anon { color: var(--muted); font-style: italic; font-weight: 500; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px;
+         background: rgba(245, 166, 35, 0.13); color: var(--amber);
+         font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
+  .qbody { font-size: 19px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
+           color: var(--text); }
+  .vote-row { display: flex; align-items: center; gap: 14px; margin-top: 16px;
+              padding-top: 14px; border-top: 1px solid var(--border); }
+  .vote-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+              padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
+              font-size: 15px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .vote-btn:hover { border-color: var(--amber); }
+  .vote-btn.upvoted { background: rgba(245, 166, 35, 0.15); border-color: var(--amber); color: var(--amber); }
+  .vote-count { font-weight: 600; font-size: 14px; cursor: pointer; user-select: none;
+                color: var(--muted); border-bottom: 1px dotted var(--muted); }
+  .vote-count:hover { color: var(--text); }
+  .upvoters { margin-top: 12px; padding: 10px 12px; background: var(--panel-2);
+              border: 1px solid var(--border); border-radius: 8px;
+              font-size: 13px; color: var(--muted); }
   .upvoters.hidden { display: none; }
-  .upvoters strong { color: #1a1a1a; }
-  h2.answers-head { font-size: 16px; margin: 24px 0 12px; color: #4a4a4a; font-weight: 600; }
-  .answer { background: #fff; border: 1px solid #e2e2dc; border-radius: 10px;
+  .upvoters strong { color: var(--text); }
+  h2.answers-head { font-size: 16px; margin: 24px 0 12px; color: var(--amber);
+                    font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+  .answer { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
             padding: 14px 16px; margin-bottom: 10px; }
   .answer .meta { margin-bottom: 6px; }
-  .answer-body { white-space: pre-wrap; word-wrap: break-word; font-size: 15px; }
-  .empty { color: #8a8a8a; font-style: italic; padding: 14px; text-align: center; }
+  .answer-body { white-space: pre-wrap; word-wrap: break-word; font-size: 15px; color: var(--text); }
+  .empty { color: var(--muted); font-style: italic; padding: 14px; text-align: center; }
   .form-card textarea { width: 100%; min-height: 100px; padding: 12px;
-                        border: 1px solid #d4d4ce; border-radius: 8px; font: inherit;
-                        font-size: 15px; resize: vertical; }
-  .form-card textarea:focus { outline: none; border-color: #2c4fb8; }
+                        background: var(--bg); color: var(--text);
+                        border: 1px solid var(--border); border-radius: 8px;
+                        font: inherit; font-size: 15px; resize: vertical; }
+  .form-card textarea:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
   .form-foot { display: flex; justify-content: space-between; align-items: center;
                margin-top: 8px; }
-  .counter { font-size: 12px; color: #8a8a8a; }
-  .counter.over { color: #c83434; font-weight: 600; }
-  button.submit { background: #2c4fb8; color: #fff; border: 0; padding: 10px 20px;
-                  border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; }
-  button.submit:hover { background: #1f3a8c; }
-  button.submit:disabled { background: #b4b4b0; cursor: not-allowed; }
-  .err { color: #c83434; font-size: 14px; margin-top: 8px; }
-  .signin-prompt { text-align: center; padding: 18px; color: #4a4a4a; }
-  .signin-prompt a { color: #2c4fb8; font-weight: 600; }
+  .counter { font-size: 12px; color: var(--muted); }
+  .counter.over { color: var(--danger); font-weight: 600; }
+  button.submit { background: var(--amber); color: #1a1408; border: 0; padding: 10px 20px;
+                  border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 15px; }
+  button.submit:hover { background: var(--amber-2); }
+  button.submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .err { color: var(--danger); font-size: 14px; margin-top: 8px; }
+  .signin-prompt { text-align: center; padding: 18px; color: var(--muted); }
+  .signin-prompt a { color: var(--amber); font-weight: 600; }
 </style>
 </head><body>
 <div class="wrap">
