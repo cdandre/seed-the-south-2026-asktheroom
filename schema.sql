@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS questions (
   tag TEXT NOT NULL DEFAULT 'Other',
   body TEXT NOT NULL,
   created_at INTEGER NOT NULL,
+  edited_at INTEGER,
   last_answered_at INTEGER,
   accepted_answer_id TEXT
 );

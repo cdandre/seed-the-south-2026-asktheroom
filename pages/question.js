@@ -101,6 +101,42 @@ const layout = (title, body) => `<!DOCTYPE html><html lang="en"><head>
   .err { color: var(--danger); font-size: 14px; margin-top: 8px; }
   .signin-prompt { text-align: center; padding: 18px; color: var(--muted); }
   .signin-prompt a { color: var(--amber); font-weight: 600; }
+  .edited-label { color: var(--muted); font-size: 12px; font-style: italic; }
+  .edit-btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer;
+    font-size: 14px; transition: all 0.15s; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .edit-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .edit-form textarea {
+    width: 100%; min-height: 110px; padding: 12px;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    font: inherit; font-size: 16px; resize: vertical;
+  }
+  .edit-form textarea:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+  .edit-form select {
+    margin-top: 10px; padding: 10px 12px; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 15px;
+    min-height: 44px;
+  }
+  .edit-form select:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+  .edit-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .edit-save {
+    background: var(--amber); color: #1a1408; border: 0; padding: 10px 20px;
+    border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 15px;
+    min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .edit-save:hover { background: var(--amber-2); }
+  .edit-save:disabled { opacity: 0.6; cursor: not-allowed; }
+  .edit-cancel {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;
+    font-size: 15px; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .edit-cancel:hover { border-color: var(--amber); }
 </style>
 </head><body>
 <div class="wrap">
@@ -141,6 +177,7 @@ app.get("/:id", async (c) => {
     const QID = ${JSON.stringify(id)};
     const SIGNED_IN = ${signedIn ? "true" : "false"};
     const CURRENT_USER_ID = ${JSON.stringify(currentUserId)};
+    const KNOWN_TAGS = ["Fundraising", "Hiring", "Product", "Sales", "Operations", "Other"];
 
     async function jsonFetch(url, opts = {}) {
       const r = await fetch(url, {
@@ -186,6 +223,13 @@ app.get("/:id", async (c) => {
       const count = q.upvote_count != null ? q.upvote_count : upvoters.length;
       const authorClass = q.anonymous ? 'author anon' : 'author';
       const authorName = q.anonymous ? 'Anonymous' : (q.author_name || 'Anonymous');
+      const isAuthor = !!CURRENT_USER_ID && q.author_id === CURRENT_USER_ID;
+      const editedLabel = q.edited_at
+        ? '<span class="edited-label" title="This question was edited">(edited)</span>'
+        : '';
+      const editBtn = isAuthor
+        ? '<button id="editbtn" class="edit-btn" style="margin-left: auto;">Edit</button>'
+        : '';
       const bookmarkBtn = SIGNED_IN
         ? ('<button id="bookmarkbtn" class="bookmark-btn' + (myBookmark ? ' on' : '') + '"' +
              ' aria-label="' + (myBookmark ? 'Unsave question' : 'Save question') + '"' +
@@ -197,10 +241,12 @@ app.get("/:id", async (c) => {
       const html =
         '<div class="meta">' +
           '<span class="' + authorClass + '">' + esc(authorName) + '</span>' +
-          (q.tag ? '<span class="tag">' + esc(q.tag) + '</span>' : '') +
+          (q.tag ? '<span class="tag" id="qtag">' + esc(q.tag) + '</span>' : '') +
           '<span>' + esc(fmtTime(q.created_at)) + '</span>' +
+          editedLabel +
+          editBtn +
         '</div>' +
-        '<div class="qbody">' + renderMarkdown(esc(q.body || q.text || '')) + '</div>' +
+        '<div class="qbody" id="qbody">' + renderMarkdown(esc(q.body || q.text || '')) + '</div>' +
         '<div class="vote-row">' +
           '<button id="votebtn" class="vote-btn' + (myVote ? ' upvoted' : '') + '"' +
             ' aria-label="Upvote question (' + count + ' upvote' + (count === 1 ? '' : 's') + ')"' +
@@ -220,7 +266,72 @@ app.get("/:id", async (c) => {
       document.getElementById('vcount').addEventListener('click', toggleUpvoters);
       const bm = document.getElementById('bookmarkbtn');
       if (bm) bm.addEventListener('click', toggleBookmark);
+      const eb = document.getElementById('editbtn');
+      if (eb) eb.addEventListener('click', () => showEditForm(q));
       renderUpvoters(upvoters);
+    }
+
+    function showEditForm(q) {
+      const card = document.getElementById('qcard');
+      if (!card) return;
+      const curBody = q.body || q.text || '';
+      const curTag = q.tag || 'Other';
+      const options = KNOWN_TAGS.map(t =>
+        '<option value="' + esc(t) + '"' + (t === curTag ? ' selected' : '') + '>' +
+          esc(t) +
+        '</option>'
+      ).join('');
+      card.innerHTML =
+        '<div class="edit-form">' +
+          '<div style="font-weight:600;margin-bottom:8px;">Edit your question</div>' +
+          '<textarea id="editbody" maxlength="2000"></textarea>' +
+          '<div><select id="edittag" aria-label="Question tag">' + options + '</select></div>' +
+          '<div class="edit-actions">' +
+            '<button class="edit-save" id="editsave">Save</button>' +
+            '<button class="edit-cancel" id="editcancel">Cancel</button>' +
+          '</div>' +
+          '<div class="err" id="editerr"></div>' +
+        '</div>';
+      const ta = document.getElementById('editbody');
+      ta.value = curBody;
+      ta.focus();
+      document.getElementById('editcancel').addEventListener('click', () => {
+        renderQuestion(qState);
+      });
+      document.getElementById('editsave').addEventListener('click', saveEdit);
+    }
+
+    async function saveEdit() {
+      const ta = document.getElementById('editbody');
+      const sel = document.getElementById('edittag');
+      const err = document.getElementById('editerr');
+      const saveBtn = document.getElementById('editsave');
+      if (err) err.textContent = '';
+      const newBody = (ta ? ta.value : '').trim();
+      const newTag = sel ? sel.value : '';
+      if (!newBody) {
+        if (err) err.textContent = 'Question text cannot be empty.';
+        return;
+      }
+      if (newBody.length > 2000) {
+        if (err) err.textContent = 'Question must be 2000 characters or fewer.';
+        return;
+      }
+      if (saveBtn) saveBtn.disabled = true;
+      try {
+        const updated = await jsonFetch('/api/questions/' + encodeURIComponent(QID), {
+          method: 'PATCH',
+          body: JSON.stringify({ body: newBody, tag: newTag }),
+        });
+        renderQuestion(updated);
+      } catch (e) {
+        if (e.status === 401) {
+          location.href = '/auth?from=/q/' + encodeURIComponent(QID);
+          return;
+        }
+        if (err) err.textContent = e.message || 'Could not save changes.';
+        if (saveBtn) saveBtn.disabled = false;
+      }
     }
 
     async function toggleBookmark() {

@@ -29,6 +29,7 @@ function rowToItem(row) {
     author_id: row.author_id,
     author_name: anonymous ? null : row.author_name,
     created_at: row.created_at,
+    edited_at: row.edited_at != null ? row.edited_at : null,
     upvote_count: Number(row.upvote_count) || 0,
     upvoter_names: upvoterNames,
     upvoters: upvoterNames.map((n) => ({ user_name: n })),
@@ -101,7 +102,7 @@ app.get("/", async (c) => {
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
-             q.created_at, q.last_answered_at, q.accepted_answer_id,
+             q.created_at, q.edited_at, q.last_answered_at, q.accepted_answer_id,
              (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
@@ -216,7 +217,7 @@ app.get("/:id", async (c) => {
       : `0`;
     const sql = `
       SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
-             q.created_at, q.last_answered_at, q.accepted_answer_id,
+             q.created_at, q.edited_at, q.last_answered_at, q.accepted_answer_id,
              (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
              (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
              (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
@@ -237,6 +238,88 @@ app.get("/:id", async (c) => {
   } catch (e) {
     console.error("GET /api/questions/:id failed:", e);
     return jsonError(c, 500, "failed to load question");
+  }
+});
+
+// Re-SELECT a single question with the same enriched shape GET /:id uses,
+// so PATCH returns a body identical to a fresh GET (upvotes, bookmark, etc.).
+async function selectQuestionItem(c, id, userId) {
+  const userVoteSubquery = userId
+    ? `(SELECT 1 FROM upvotes uu WHERE uu.question_id = q.id AND uu.user_id = ?)`
+    : `0`;
+  const bookmarkSubquery = userId
+    ? `(SELECT 1 FROM bookmarks bb WHERE bb.question_id = q.id AND bb.user_id = ?)`
+    : `0`;
+  const sql = `
+    SELECT q.id, q.author_id, q.author_name, q.anonymous, q.tag, q.body,
+           q.created_at, q.edited_at, q.last_answered_at, q.accepted_answer_id,
+           (SELECT COUNT(*) FROM upvotes u  WHERE u.question_id  = q.id) AS upvote_count,
+           (SELECT COUNT(*) FROM answers a  WHERE a.question_id  = q.id) AS answer_count,
+           (SELECT GROUP_CONCAT(u2.user_name, '${UPVOTER_SEP}')
+              FROM upvotes u2 WHERE u2.question_id = q.id) AS upvoter_names_csv,
+           ${userVoteSubquery} AS user_upvoted_marker,
+           ${bookmarkSubquery} AS bookmarked_marker
+      FROM questions q
+     WHERE q.id = ?
+  `;
+  const binds = userId ? [userId, userId, id] : [id];
+  const row = await c.env.DB.prepare(sql).bind(...binds).first();
+  return row ? rowToItem(row) : null;
+}
+
+// PATCH /api/questions/:id — edit your own question's body + tag.
+// Anonymity is intentionally NOT editable here; it stays whatever it was.
+app.patch("/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!id) return jsonError(c, 400, "missing id");
+
+  const session = c.get("session");
+  if (!session?.user) return jsonError(c, 401, "sign in required");
+  const userId = session.user.id;
+
+  let payload;
+  try {
+    payload = await c.req.json();
+  } catch {
+    return jsonError(c, 400, "invalid JSON body");
+  }
+
+  const rawText = payload?.body ?? payload?.text;
+  const text = typeof rawText === "string" ? rawText.trim() : "";
+  const tag = typeof payload?.tag === "string" ? payload.tag : "";
+
+  if (!text || text.length < 1 || text.length > 2000) {
+    return jsonError(c, 400, "text must be 1-2000 characters");
+  }
+  if (!KNOWN_TAGS.includes(tag)) {
+    return jsonError(c, 400, "tag must be one of: " + KNOWN_TAGS.join(", "));
+  }
+
+  try {
+    const existing = await c.env.DB.prepare(
+      `SELECT id, author_id FROM questions WHERE id = ?`
+    )
+      .bind(id)
+      .first();
+
+    if (!existing) return jsonError(c, 404, "question not found");
+    if (existing.author_id !== userId) {
+      return jsonError(c, 403, "only the author can edit");
+    }
+
+    const now = Date.now();
+    await c.env.DB.prepare(
+      `UPDATE questions SET body = ?, tag = ?, edited_at = ? WHERE id = ?`
+    )
+      .bind(text, tag, now, id)
+      .run();
+
+    const item = await selectQuestionItem(c, id, userId);
+    if (!item) return jsonError(c, 404, "question not found");
+    return c.json(item);
+  } catch (e) {
+    console.error("PATCH /api/questions/:id failed:", e);
+    return jsonError(c, 500, "failed to update question");
   }
 });
 
