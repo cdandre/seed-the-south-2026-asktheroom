@@ -73,6 +73,17 @@ const layout = (userName) => `<!doctype html>
     .ask textarea { min-height: 90px; resize: vertical; }
     .ask textarea#ask-tried { min-height: 60px; }
     .ask textarea:focus, .ask select:focus, .ask input[type="text"]:focus { outline: 2px solid var(--amber); border-color: var(--amber); }
+    .ask-toggle {
+      background: transparent; border: 0; color: var(--muted); cursor: pointer;
+      font: inherit; font-size: 13px; padding: 8px 2px; margin: 2px 0 6px;
+      min-height: 44px; display: inline-flex; align-items: center; gap: 6px;
+      text-align: left;
+    }
+    .ask-toggle:hover { color: var(--amber); }
+    .ask-toggle .chev { font-size: 11px; transition: transform 0.15s ease; }
+    .ask-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+    .ask-extra { display: none; }
+    .ask-extra.on { display: block; }
     .ask-row {
       display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap;
     }
@@ -198,16 +209,22 @@ const layout = (userName) => `<!doctype html>
       <h2>Ask the room</h2>
       <form id="ask-form">
         <div class="ask-field">
-          <label for="ask-context">Where you're at <span class="opt">(optional)</span></label>
-          <input type="text" id="ask-context" maxlength="200" placeholder="e.g., Pre-seed B2B SaaS, 4 months in" />
+          <label for="ask-body">Your question</label>
+          <textarea id="ask-body" maxlength="1000" placeholder="What do you want to ask the room?" required></textarea>
         </div>
-        <div class="ask-field">
-          <label for="ask-body">Your ask</label>
-          <textarea id="ask-body" maxlength="1000" placeholder="What do you wish someone would answer in 30 seconds?" required></textarea>
-        </div>
-        <div class="ask-field">
-          <label for="ask-tried">What you've tried <span class="opt">(optional)</span></label>
-          <textarea id="ask-tried" maxlength="500" placeholder="Briefly — saves us time and gets you better answers"></textarea>
+        <button type="button" id="ask-toggle" class="ask-toggle" aria-expanded="false" aria-controls="ask-extra">
+          <span class="chev" aria-hidden="true">&#9656;</span>
+          <span id="ask-toggle-label">Add context</span>
+        </button>
+        <div class="ask-extra" id="ask-extra">
+          <div class="ask-field">
+            <label for="ask-context">Where you're at <span class="opt">(optional)</span></label>
+            <input type="text" id="ask-context" maxlength="200" placeholder="e.g., Pre-seed B2B SaaS, 4 months in" />
+          </div>
+          <div class="ask-field">
+            <label for="ask-tried">What you've tried <span class="opt">(optional)</span></label>
+            <textarea id="ask-tried" maxlength="500" placeholder="Briefly — saves us time and gets you better answers"></textarea>
+          </div>
         </div>
         <div class="ask-row">
           <select id="ask-tag">
@@ -457,16 +474,36 @@ const layout = (userName) => `<!doctype html>
     const askForm = document.getElementById("ask-form");
     const askErr = document.getElementById("ask-err");
     const askBtn = document.getElementById("ask-submit");
+
+    // Optional structure is opt-in: Context + What-you-tried stay hidden until
+    // the user taps "Add context". A simple question is just one box.
+    const askToggle = document.getElementById("ask-toggle");
+    const askExtra = document.getElementById("ask-extra");
+    const askToggleLabel = document.getElementById("ask-toggle-label");
+    let askExtraOpen = false;
+    function setAskExtra(open) {
+      askExtraOpen = open;
+      askExtra.classList.toggle("on", open);
+      askToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      askToggleLabel.textContent = open ? "Hide context" : "Add context";
+      if (open) {
+        const ctx = document.getElementById("ask-context");
+        if (ctx) ctx.focus();
+      }
+    }
+    askToggle.addEventListener("click", () => setAskExtra(!askExtraOpen));
+
     askForm.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       askErr.textContent = "";
-      const context = document.getElementById("ask-context").value.trim();
       const ask = document.getElementById("ask-body").value.trim();
-      const tried = document.getElementById("ask-tried").value.trim();
+      // Only fold in the optional fields when the user opened the extra section.
+      const context = askExtraOpen ? document.getElementById("ask-context").value.trim() : "";
+      const tried = askExtraOpen ? document.getElementById("ask-tried").value.trim() : "";
       const tag = document.getElementById("ask-tag").value;
       const anonymous = document.getElementById("ask-anon").checked;
       if (!ask) { askErr.textContent = "Question can't be empty."; return; }
-      // Serialize three fields into a single body string. Skip empty optional sections.
+      // Serialize into a single body string. Skip empty optional sections.
       const parts = [];
       if (context) parts.push("**Context:** " + context);
       parts.push(ask);
@@ -483,6 +520,7 @@ const layout = (userName) => `<!doctype html>
         document.getElementById("ask-body").value = "";
         document.getElementById("ask-tried").value = "";
         document.getElementById("ask-anon").checked = false;
+        setAskExtra(false);
         await loadFeed();
       } catch (e) {
         askErr.textContent = e.message;
